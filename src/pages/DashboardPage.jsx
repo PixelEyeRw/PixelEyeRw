@@ -120,15 +120,15 @@ function AccountManagerOverview({ ams, onReassign }) {
           const pct = am.activeProjects / am.capacityMax;
           const status = capacityStatus(pct);
           return (
-            <div key={am.id} className="flex items-center justify-between rounded p-3" style={{ border: `1px solid ${colors.border}` }}>
-              <div>
-                <div style={{ ...fontBody, color: colors.primary }} className="font-semibold text-sm">{am.name}</div>
-                <div style={{ ...fontBody, color: colors.muted }} className="text-xs">{am.title}</div>
+            <div key={am.id} className="flex items-center justify-between rounded p-3 min-w-0" style={{ border: `1px solid ${colors.border}` }}>
+              <div className="min-w-0">
+                <div style={{ ...fontBody, color: colors.primary }} className="font-semibold text-sm truncate">{am.name}</div>
+                <div style={{ ...fontBody, color: colors.muted }} className="text-xs truncate break-words">{am.title}</div>
               </div>
-              <div style={{ ...fontBody, color: colors.muted }} className="text-xs text-center w-16">{am.clients} clients</div>
-              <div style={{ ...fontBody, color: colors.muted }} className="text-xs text-center w-20">{am.activeProjects} projects</div>
-              <div className="flex items-center gap-2 w-40 justify-end">
-                <span className="text-xs font-semibold px-2 py-1 rounded" style={{ ...fontBody, color: colors.neutral, background: status.color }}>
+              <div style={{ ...fontBody, color: colors.muted }} className="text-xs text-center w-16 overflow-hidden truncate">{am.clients} clients</div>
+              <div style={{ ...fontBody, color: colors.muted }} className="text-xs text-center w-20 overflow-hidden truncate">{am.activeProjects} projects</div>
+              <div className="flex items-center gap-2 w-40 justify-end min-w-0">
+                <span className="text-xs font-semibold px-2 py-1 rounded overflow-hidden truncate" style={{ ...fontBody, color: colors.neutral, background: status.color }}>
                   {status.label}
                 </span>
                 {pct >= 1 && (
@@ -157,40 +157,42 @@ function DeletedTaskLog({ rows, onRestore }) {
           <input placeholder="Search by user or task..." className="text-xs outline-none" style={fontBody} />
         </div>
       </div>
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr style={{ ...fontBody, color: colors.muted }} className="text-xs uppercase">
-            <th className="pb-2">Timestamp</th>
-            <th className="pb-2">Deleted task</th>
-            <th className="pb-2">Responsible actor</th>
-            <th className="pb-2">Reason code</th>
-            <th className="pb-2">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} style={{ borderTop: `1px solid ${colors.border}` }}>
-              <td className="py-3" style={{ ...fontBody, color: colors.muted }}>{row.timestamp}</td>
-              <td className="py-3 font-semibold" style={{ ...fontBody, color: colors.primary }}>{row.task}</td>
-              <td className="py-3" style={{ ...fontBody, color: colors.muted }}>{row.actor}</td>
-              <td className="py-3">
-                <span className="text-xs px-2 py-1 rounded" style={{ ...fontBody, background: colors.tertiary, color: colors.primary }}>
-                  {row.reason}
-                </span>
-              </td>
-              <td className="py-3">
-                {row.restored ? (
-                  <span style={{ ...fontBody, color: colors.onTrack }} className="text-xs font-semibold">Restored</span>
-                ) : (
-                  <button onClick={() => onRestore(row.id)} className="flex items-center gap-1 text-xs font-semibold" style={{ ...fontBody, color: colors.secondary }}>
-                    <RotateCcw size={12} /> Restore
-                  </button>
-                )}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="min-w-[700px] w-full text-left text-sm">
+          <thead>
+            <tr style={{ ...fontBody, color: colors.muted }} className="text-xs uppercase">
+              <th className="pb-2">Timestamp</th>
+              <th className="pb-2">Deleted task</th>
+              <th className="pb-2">Responsible actor</th>
+              <th className="pb-2">Reason code</th>
+              <th className="pb-2">Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} style={{ borderTop: `1px solid ${colors.border}` }}>
+                <td className="py-3" style={{ ...fontBody, color: colors.muted }}>{row.timestamp}</td>
+                <td className="py-3 font-semibold" style={{ ...fontBody, color: colors.primary }}>{row.task}</td>
+                <td className="py-3" style={{ ...fontBody, color: colors.muted }}>{row.actor}</td>
+                <td className="py-3">
+                  <span className="text-xs px-2 py-1 rounded" style={{ ...fontBody, background: colors.tertiary, color: colors.primary }}>
+                    {row.reason}
+                  </span>
+                </td>
+                <td className="py-3">
+                  {row.restored ? (
+                    <span style={{ ...fontBody, color: colors.onTrack }} className="text-xs font-semibold">Restored</span>
+                  ) : (
+                    <button onClick={() => onRestore(row.id)} className="flex items-center gap-1 text-xs font-semibold" style={{ ...fontBody, color: colors.secondary }}>
+                      <RotateCcw size={12} /> Restore
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
