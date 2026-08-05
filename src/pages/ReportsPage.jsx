@@ -1,42 +1,243 @@
-import React, { useState } from "react";
-import { Download } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Download, FileText, Upload, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
-import { REPORT_SHORTCUTS, COMPLETION_TREND } from "../lib/mockData";
+import { REPORT_SHORTCUTS, COMPLETION_TREND, PROJECTS } from "../lib/mockData";
+import { getSession, getStoredReports, getStoredTasks, saveStoredReports } from "../lib/teamData";
 
-// GET /api/om/reports/:type
-export default function ReportsPage({ ams }) {
+export default function ReportsPage({ ams = [] }) {
+  const session = getSession();
+  const [reports, setReports] = useState([]);
+  const [message, setMessage] = useState("");
+  const [kind, setKind] = useState("general");
+  const [projectId, setProjectId] = useState("");
+  const [files, setFiles] = useState([]);
+  const [statusMessage, setStatusMessage] = useState("");
   const [generating, setGenerating] = useState(null);
+
+  useEffect(() => {
+    setReports(getStoredReports());
+  }, []);
+
+  const assignedProjects = useMemo(() => {
+    if (!session?.role?.toLowerCase().includes("account")) return PROJECTS;
+    return PROJECTS.filter((project) => project.am === session.name);
+  }, [session]);
+
+  const summary = useMemo(() => {
+    const tasks = getStoredTasks().filter((task) => {
+      return !session?.role?.toLowerCase().includes("account") || assignedProjects.some((project) => project.id === task.projectId);
+    });
+    const completed = tasks.filter((task) => task.done).length;
+    const totalTasks = tasks.length;
+    const avgProgress = assignedProjects.length
+      ? Math.round(assignedProjects.reduce((sum, project) => sum + project.progress, 0) / assignedProjects.length)
+      : 0;
+    return { totalTasks, completed, avgProgress };
+  }, [assignedProjects, session]);
+
+  const perAm = useMemo(() => ams.map((a) => ({ am: a.name, projects: a.activeProjects })), [ams]);
+
+  const handleFileChange = (event) => {
+    setFiles(Array.from(event.target.files || []));
+  };
+
   const generate = (key) => {
     setGenerating(key);
-    setTimeout(() => setGenerating(null), 900); // demo only — real call hits the endpoint above
+    setTimeout(() => setGenerating(null), 900);
   };
-  const perAm = ams.map((a) => ({ am: a.name, projects: a.activeProjects }));
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!message.trim()) {
+      setStatusMessage("Please add a message for the report.");
+      return;
+    }
+    if (kind === "project" && !projectId) {
+      setStatusMessage("Please select a project for a project report.");
+      return;
+    }
+
+    const report = {
+      id: `report_${Date.now()}`,
+      author: session?.name || "Unknown",
+      role: session?.role || "Unknown",
+      type: kind,
+      projectId: kind === "project" ? projectId : null,
+      projectTitle: kind === "project" ? assignedProjects.find((project) => project.id === projectId)?.title : null,
+      message: message.trim(),
+      attachments: files.map((file) => file.name),
+      createdAt: new Date().toLocaleString(),
+      status: "Pending",
+    };
+
+    const next = [report, ...reports];
+    saveStoredReports(next);
+    setReports(next);
+    setMessage("");
+    setProjectId("");
+    setFiles([]);
+    setStatusMessage("Report submitted successfully.");
+  };
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-2xl sm:text-3xl font-bold">Reports</h1>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {REPORT_SHORTCUTS.map((s) => (
-          <div key={s.key} className="rounded-lg p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-            <div style={{ ...fontDisplay, color: colors.primary }} className="text-base font-bold mb-1">{s.label}</div>
-            <div style={{ color: colors.muted, ...fontBody }} className="text-xs mb-4">{s.desc}</div>
-            <button
-              onClick={() => generate(s.key)}
-              className="flex items-center justify-center gap-2 w-full rounded py-2 text-xs font-semibold"
-              style={{ background: colors.primary, color: colors.neutral, ...fontBody }}
-            >
-              <Download size={12} />
-              {generating === s.key ? "Generating..." : "Generate"}
-            </button>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-2xl sm:text-3xl font-bold">Reports</h1>
+          <p style={{ ...fontBody, color: colors.muted }} className="mt-2 max-w-2xl text-sm">
+            Submit general or project-specific reports and view autogenerated task progress summaries.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+            <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Tasks tracked</div>
+            <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.totalTasks}</div>
           </div>
-        ))}
+          <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+            <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Tasks complete</div>
+            <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.onTrack }}>{summary.completed}</div>
+          </div>
+          <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+            <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Avg progress</div>
+            <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.avgProgress}%</div>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">Active Projects per AM</h3>
+          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: colors.primary, ...fontBody }}>
+            <FileText size={18} /> Create a report
+          </div>
+          <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+            <div>
+              <label className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Report type</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[
+                  { value: "general", label: "General" },
+                  { value: "project", label: "Project" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setKind(option.value)}
+                    className="text-xs font-semibold px-3 py-2 rounded"
+                    style={{
+                      border: `1px solid ${colors.primary}`,
+                      background: kind === option.value ? colors.primary : "transparent",
+                      color: kind === option.value ? colors.neutral : colors.primary,
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {kind === "project" && (
+              <div>
+                <label className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Project</label>
+                <select
+                  value={projectId}
+                  onChange={(event) => setProjectId(event.target.value)}
+                  className="mt-2 w-full rounded p-3 text-sm"
+                  style={{ border: `1px solid ${colors.border}`, ...fontBody }}
+                >
+                  <option value="">Select a project</option>
+                  {assignedProjects.map((project) => (
+                    <option key={project.id} value={project.id}>{project.title}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Message</label>
+              <textarea
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                rows={5}
+                className="mt-2 w-full rounded p-3 text-sm"
+                style={{ border: `1px solid ${colors.border}`, ...fontBody }}
+                placeholder="Describe what you want the OM to review, plus any blockers or next steps."
+              />
+            </div>
+
+            <div>
+              <label className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Attachments</label>
+              <input type="file" multiple onChange={handleFileChange} className="mt-2 w-full text-sm" />
+              {files.length > 0 && (
+                <div className="mt-2 text-xs" style={{ ...fontBody, color: colors.muted }}>
+                  {files.map((file) => file.name).join(", ")}
+                </div>
+              )}
+            </div>
+
+            {statusMessage && (
+              <div className="rounded-xl px-4 py-3" style={{ background: "#F9F5FF", border: `1px solid ${colors.border}`, color: colors.primary, ...fontBody }}>
+                {statusMessage}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="flex items-center justify-center gap-2 rounded px-4 py-3 text-sm font-semibold"
+              style={{ background: colors.primary, color: colors.neutral, ...fontBody }}
+            >
+              <Upload size={14} /> Submit report
+            </button>
+          </form>
+        </div>
+
+        <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: colors.primary, ...fontBody }}>
+            <Activity size={18} /> Autogenerated summary
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl p-4" style={{ background: "#F6FAF6", border: `1px solid ${colors.border}` }}>
+              <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Tasks tracked</div>
+              <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.totalTasks}</div>
+            </div>
+            <div className="rounded-xl p-4" style={{ background: "#EFF6FF", border: `1px solid ${colors.border}` }}>
+              <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Completed</div>
+              <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.onTrack }}>{summary.completed}</div>
+            </div>
+            <div className="rounded-xl p-4" style={{ background: "#FFFFFF", border: `1px solid ${colors.border}` }}>
+              <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Avg progress</div>
+              <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.avgProgress}%</div>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            {reports.length === 0 ? (
+              <div style={{ ...fontBody, color: colors.muted }} className="text-sm">No reports submitted yet.</div>
+            ) : (
+              reports.slice(0, 4).map((report) => (
+                <div key={report.id} className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+                  <div className="flex items-center justify-between gap-3 text-sm" style={{ color: colors.muted, ...fontBody }}>
+                    <span>{report.createdAt}</span>
+                    <span>{report.author}</span>
+                  </div>
+                  <div className="mt-2 font-semibold" style={{ ...fontBody, color: colors.primary }}>
+                    {report.type === "general" ? "General report" : `Project report: ${report.projectTitle}`}
+                  </div>
+                  <p className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>{report.message}</p>
+                  {report.attachments.length > 0 && (
+                    <div className="mt-2 text-xs" style={{ ...fontBody, color: colors.muted }}>
+                      Attachments: {report.attachments.join(", ")}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">Activity by AM</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={perAm}>
               <XAxis dataKey="am" tick={{ fontSize: 11, fontFamily: "Montserrat" }} stroke={colors.muted} />
@@ -48,7 +249,7 @@ export default function ReportsPage({ ams }) {
         </div>
 
         <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">On-Time Delivery Trend</h3>
+          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">Delivery trend</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={COMPLETION_TREND}>
               <CartesianGrid stroke={colors.border} strokeDasharray="3 3" />
@@ -58,6 +259,24 @@ export default function ReportsPage({ ams }) {
               <Line type="monotone" dataKey="onTime" stroke={colors.onTrack} strokeWidth={2} dot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+        <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: colors.primary, ...fontBody }}>
+          <Activity size={16} /> Latest report activity
+        </div>
+        <div className="mt-4 space-y-3">
+          {reports.slice(0, 3).map((report) => (
+            <div key={report.id} className="rounded-lg p-4" style={{ background: "#FFFFFF", border: `1px solid ${colors.border}` }}>
+              <div className="flex items-center justify-between gap-3 text-sm" style={{ color: colors.muted, ...fontBody }}>
+                <span>{report.createdAt}</span>
+                <span>{report.author}</span>
+              </div>
+              <p className="mt-2" style={{ ...fontBody, color: colors.primary }}>{report.message}</p>
+            </div>
+          ))}
+          {reports.length === 0 && <div style={{ ...fontBody, color: colors.muted }} className="text-sm">No activity yet.</div>}
         </div>
       </div>
     </div>

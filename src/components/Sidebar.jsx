@@ -15,7 +15,8 @@ const NAV_ITEMS = [
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
-export default function Sidebar({ active, onNavigate, isOpen, onToggle }) {
+export default function Sidebar({ active, onNavigate, navItems, isOpen, onToggle }) {
+  const items = navItems || NAV_ITEMS;
   return (
     <>
       {isOpen && <div className="fixed inset-0 bg-black bg-opacity-30 lg:hidden z-40" onClick={onToggle} />}
@@ -51,7 +52,7 @@ export default function Sidebar({ active, onNavigate, isOpen, onToggle }) {
         )}
 
         <nav className="flex-1 flex flex-col gap-2 p-2 lg:p-3 overflow-y-auto" aria-label="Primary">
-          {NAV_ITEMS.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === active;
             return (

@@ -3,6 +3,7 @@ import { Search, X } from "lucide-react";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
 import { healthBadge } from "../lib/status";
 import { CLIENTS } from "../lib/mockData";
+import { getSession } from "../lib/teamData";
 
 function ClientDrawer({ client, onClose, onViewProjects }) {
   const badge = healthBadge(client.health);
@@ -44,6 +45,7 @@ function ClientDrawer({ client, onClose, onViewProjects }) {
 
 // GET /api/om/clients?health=&q=
 export default function ClientsPage({ onNavigate }) {
+  const session = getSession();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState(null);
@@ -51,11 +53,12 @@ export default function ClientsPage({ onNavigate }) {
   const filtered = useMemo(
     () =>
       CLIENTS.filter((c) => {
+        const isVisibleToAM = session?.role?.toLowerCase().includes("account") ? c.am === session.name : true;
         const matchesQuery = c.name.toLowerCase().includes(query.toLowerCase());
         const matchesFilter = filter === "all" || c.health === filter;
-        return matchesQuery && matchesFilter;
+        return isVisibleToAM && matchesQuery && matchesFilter;
       }),
-    [query, filter]
+    [query, filter, session]
   );
 
   return (

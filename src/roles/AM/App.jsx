@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Settings as SettingsIcon } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
 import AMDashboard from "../../pages/AMDashboard";
@@ -6,11 +7,19 @@ import ClientsPage from "../../pages/ClientsPage";
 import ProjectsPage from "../../pages/ProjectsPage";
 import CalendarPage from "../../pages/CalendarPage";
 import ReportsPage from "../../pages/ReportsPage";
-import WorkloadPage from "../../pages/WorkloadPage";
 import SettingsPage from "../../pages/SettingsPage";
 import AMIncoming from "../../pages/AMIncoming";
 import AMDailyPlanner from "../../pages/AMDailyPlanner";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
+
+const AM_NAV_ITEMS = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "clients", label: "Clients", icon: Users },
+  { key: "projects", label: "Projects", icon: Briefcase },
+  { key: "calendar", label: "Calendar", icon: CalendarDays },
+  { key: "reports", label: "Reports", icon: BarChart3 },
+  { key: "settings", label: "Settings", icon: SettingsIcon },
+];
 
 export default function AMApp({ onSignOut }) {
   const [page, setPage] = useState("dashboard");
@@ -19,7 +28,7 @@ export default function AMApp({ onSignOut }) {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row" style={{ ...fontBody, background: "#FAF9F6" }}>
       <style>{GOOGLE_FONTS_IMPORT}</style>
-      <Sidebar active={page} onNavigate={setPage} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar active={page} onNavigate={setPage} navItems={AM_NAV_ITEMS} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
         <Topbar onSidebarToggle={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
         <div className="px-4 py-2 flex items-center justify-between gap-4">
@@ -37,7 +46,6 @@ export default function AMApp({ onSignOut }) {
         {page === "projects" && <ProjectsPage />}
         {page === "calendar" && <CalendarPage />}
         {page === "reports" && <ReportsPage />}
-        {page === "workload" && <WorkloadPage />}
         {page === "settings" && <SettingsPage />}
         {page === "incoming" && <AMIncoming />}
         {page === "daily" && <AMDailyPlanner />}

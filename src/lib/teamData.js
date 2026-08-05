@@ -4,6 +4,7 @@ const ACCOUNTS_STORAGE_KEY = "pixeleye-accounts";
 const SESSION_STORAGE_KEY = "pixeleye_session";
 const AM_ACKS_KEY = "pixeleye-am-acks";
 const TASKS_STORAGE_KEY = "pixeleye-tasks";
+const REPORTS_STORAGE_KEY = "pixeleye-reports";
 
 export const defaultProfile = {
   name: "Ava Patel",
@@ -119,4 +120,19 @@ export function getStoredTasks() {
 export function saveStoredTasks(tasks) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+}
+
+export function getStoredReports() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(REPORTS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredReports(reports) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
 }

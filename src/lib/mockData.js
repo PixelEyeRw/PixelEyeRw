@@ -43,6 +43,60 @@ export const PROJECTS = [
   { id: "p5", title: "Solstice Pitch Deck", client: "Solstice Energy", am: "Marcus Thorne", priority: "LOW", status: "on_track", progress: 15 },
 ];
 
+export const PROJECT_DELIVERABLES = {
+  p1: [
+    { id: "d1", title: "Concept mood boards", due: "Aug 12", status: "complete" },
+    { id: "d2", title: "Visual system exploration", due: "Aug 14", status: "pending" },
+    { id: "d3", title: "Creative review deck", due: "Aug 18", status: "pending" },
+  ],
+  p2: [
+    { id: "d4", title: "Homepage wireframes", due: "Aug 9", status: "complete" },
+    { id: "d5", title: "Design handoff", due: "Aug 17", status: "pending" },
+    { id: "d6", title: "Launch readiness checklist", due: "Aug 21", status: "pending" },
+  ],
+  p3: [
+    { id: "d7", title: "Brand manifesto copy", due: "Aug 11", status: "complete" },
+    { id: "d8", title: "Campaign asset library", due: "Aug 16", status: "pending" },
+    { id: "d9", title: "Analytics dashboard setup", due: "Aug 20", status: "pending" },
+  ],
+  p4: [
+    { id: "d10", title: "Phase 1 install review", due: "Aug 10", status: "complete" },
+    { id: "d11", title: "Stakeholder sign-off", due: "Aug 15", status: "pending" },
+    { id: "d12", title: "Quality audit report", due: "Aug 19", status: "pending" },
+  ],
+  p5: [
+    { id: "d13", title: "Client storyboard review", due: "Aug 8", status: "complete" },
+    { id: "d14", title: "Final deck polish", due: "Aug 14", status: "pending" },
+    { id: "d15", title: "Executive summary", due: "Aug 18", status: "pending" },
+  ],
+};
+
+export const PROJECT_HISTORY = {
+  p1: [
+    { id: "h1", actor: "Elena Rossi", text: "Shared new brand direction with client", time: "2 hours ago" },
+    { id: "h2", actor: "System", text: "Q4 Brand Refresh moved to on_track", time: "Yesterday" },
+    { id: "h3", actor: "Design Team", text: "Completed first visual exploration", time: "2 days ago" },
+  ],
+  p2: [
+    { id: "h4", actor: "Elena Rossi", text: "Raised priority for launch readiness items", time: "3 hours ago" },
+    { id: "h5", actor: "QA Team", text: "Reported layout issues on tablet view", time: "Yesterday" },
+    { id: "h6", actor: "System", text: "Website Launch marked at_risk", time: "2 days ago" },
+  ],
+  p3: [
+    { id: "h7", actor: "Marcus Thorne", text: "Approved campaign asset library format", time: "1 hour ago" },
+    { id: "h8", actor: "System", text: "Acme AI Launch remains on_track", time: "Yesterday" },
+  ],
+  p4: [
+    { id: "h9", actor: "Jordan Vance", text: "Requested urgent client sign-off", time: "30 mins ago" },
+    { id: "h10", actor: "System", text: "Global Tech Phase 1 overdue alert sent", time: "Today" },
+    { id: "h11", actor: "Production", text: "Started quality audit round", time: "Yesterday" },
+  ],
+  p5: [
+    { id: "h12", actor: "Marcus Thorne", text: "Shared pitch deck draft with the client", time: "Today" },
+    { id: "h13", actor: "System", text: "Solstice Pitch Deck progress updated", time: "Yesterday" },
+  ],
+};
+
 export const TIMELINE_DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
 export const TIMELINE_DATES = [12, 13, 14, 15, 16, 17];
 

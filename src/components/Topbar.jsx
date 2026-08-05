@@ -1,8 +1,22 @@
 import React from "react";
 import { Search, Bell, Menu } from "lucide-react";
 import { colors, fontBody } from "../lib/theme";
+import { getSession } from "../lib/teamData";
+
+function displayRoleLabel(role) {
+  const normalized = (role || "").toLowerCase();
+  if (normalized.includes("account")) return "Account Manager";
+  if (normalized.includes("operation")) return "Operations Manager";
+  if (normalized.includes("director")) return "Director";
+  if (normalized.includes("production")) return "Production";
+  return role || "Team Member";
+}
 
 export default function Topbar({ onSidebarToggle, sidebarOpen }) {
+  const session = getSession();
+  const displayName = session?.name || "Sr. Producer";
+  const roleLabel = displayRoleLabel(session?.role);
+
   return (
     <div
       className="flex flex-col gap-3 px-4 py-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between"
@@ -28,10 +42,10 @@ export default function Topbar({ onSidebarToggle, sidebarOpen }) {
         </button>
         <div className="text-right">
           <div style={{ color: colors.primary, ...fontBody }} className="text-sm font-semibold">
-            Sr. Producer
+            {displayName}
           </div>
           <div style={{ color: colors.muted, ...fontBody }} className="text-xs">
-            Operations Manager
+            {roleLabel}
           </div>
         </div>
       </div>
