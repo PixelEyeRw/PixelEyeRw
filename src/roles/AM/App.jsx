@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
-import DashboardPage from "../../pages/DashboardPage";
+import AMDashboard from "../../pages/AMDashboard";
 import ClientsPage from "../../pages/ClientsPage";
 import ProjectsPage from "../../pages/ProjectsPage";
 import CalendarPage from "../../pages/CalendarPage";
@@ -32,7 +32,7 @@ export default function AMApp({ onSignOut }) {
           </div>
         </div>
 
-        {page === "dashboard" && <DashboardPage />}
+        {page === "dashboard" && <AMDashboard />}
         {page === "clients" && <ClientsPage onNavigate={setPage} />}
         {page === "projects" && <ProjectsPage />}
         {page === "calendar" && <CalendarPage />}

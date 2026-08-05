@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Plus, X, Upload, Mail, Link2 } from "lucide-react";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
 import { CAPABILITIES, INITIAL_ROLES } from "../lib/mockData";
-import { buildInviteLink, createInviteToken, defaultProfile, getStoredInvites, getStoredProfile, saveStoredInvites, saveStoredProfile } from "../lib/teamData";
+import { buildInviteLink, createInviteToken, defaultProfile, getStoredInvites, getStoredProfile, saveStoredInvites, saveStoredProfile, getSession } from "../lib/teamData";
 
 function RoleEditor({ role, onClose, onSave }) {
   const [name, setName] = useState(role?.name || "");
@@ -70,6 +70,10 @@ export default function SettingsPage() {
     setProfile(getStoredProfile());
     setInvites(getStoredInvites());
   }, []);
+
+  const session = getSession();
+  const roleText = session?.role?.toLowerCase() || "";
+  const isOmOrDirector = roleText.includes("operation") || roleText.includes("operations") || roleText.includes("director") || roleText.includes("ops");
 
   const profileAvatar = useMemo(() => profile.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80", [profile.avatar]);
 
@@ -169,6 +173,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
+{isOmOrDirector && (
       <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -213,7 +218,9 @@ export default function SettingsPage() {
           ))}
         </div>
       </div>
+      )}
 
+{isOmOrDirector && (
       <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
         <div className="flex items-center justify-between mb-4">
           <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg">Roles & Permissions</h3>
@@ -251,7 +258,7 @@ export default function SettingsPage() {
           </tbody>
         </table>
       </div>
-
+      )}
       <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
         <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">General</h3>
         <label style={{ ...fontBody, color: colors.muted }} className="text-xs uppercase block mb-1">Studio name</label>
