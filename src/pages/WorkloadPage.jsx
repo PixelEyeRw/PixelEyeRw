@@ -11,17 +11,19 @@ export default function WorkloadPage({ ams, onReassign }) {
   const [view, setView] = useState("am");
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-3xl font-bold">Workload</h1>
-        <div className="flex gap-2">
+    <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-2xl sm:text-3xl font-bold">Workload</h1>
+        <div className="flex flex-wrap gap-2">
           {[
             { key: "am", label: "By Account Manager" },
             { key: "role", label: "By Production Role" },
           ].map((v) => (
             <button
               key={v.key}
+              type="button"
               onClick={() => setView(v.key)}
+              aria-pressed={view === v.key}
               className="text-xs font-semibold px-3 py-1.5 rounded"
               style={{
                 border: `1px solid ${colors.primary}`,
@@ -36,7 +38,7 @@ export default function WorkloadPage({ ams, onReassign }) {
       </div>
 
       {view === "am" ? (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {ams.map((am) => {
             const pct = am.activeProjects / am.capacityMax;
             const status = capacityStatus(pct);
@@ -64,7 +66,7 @@ export default function WorkloadPage({ ams, onReassign }) {
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {PRODUCTION_ROLES.map((r) => {
             const pct = r.activeTasks / r.capacityMax;
             const status = capacityStatus(pct);

@@ -26,19 +26,22 @@ export default function CalendarPage() {
     .sort((a, b) => a.day - b.day);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-3xl font-bold">Calendar</h1>
-        <select value={amFilter} onChange={(e) => setAmFilter(e.target.value)} className="rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}` }}>
-          <option value="all">All account managers</option>
-          <option value="Elena Rossi">Elena Rossi</option>
-          <option value="Marcus Thorne">Marcus Thorne</option>
-          <option value="Jordan Vance">Jordan Vance</option>
-        </select>
+    <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-2xl sm:text-3xl font-bold">Calendar</h1>
+        <label className="text-sm" style={{ color: colors.muted }}>
+          <span className="sr-only">Filter deadlines by account manager</span>
+          <select value={amFilter} onChange={(e) => setAmFilter(e.target.value)} className="rounded px-3 py-2 text-sm w-full sm:w-auto" style={{ border: `1px solid ${colors.border}` }}>
+            <option value="all">All account managers</option>
+            <option value="Elena Rossi">Elena Rossi</option>
+            <option value="Marcus Thorne">Marcus Thorne</option>
+            <option value="Jordan Vance">Jordan Vance</option>
+          </select>
+        </label>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
           <div className="flex items-center gap-2 mb-4">
             <ChevronLeft size={16} color={colors.muted} />
             <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg">June 2024</h3>
@@ -54,9 +57,11 @@ export default function CalendarPage() {
               const hasDeadline = day && DEADLINES[day];
               const isSelected = day === selectedDay;
               return (
-                <div
+                <button
                   key={i}
+                  type="button"
                   onClick={() => day && setSelectedDay(day)}
+                  disabled={!day}
                   className="rounded aspect-square flex flex-col items-center justify-center cursor-pointer text-sm"
                   style={{
                     background: isSelected ? colors.primary : "transparent",
@@ -67,7 +72,7 @@ export default function CalendarPage() {
                 >
                   {day}
                   {hasDeadline && <span className="w-1.5 h-1.5 rounded-full mt-0.5" style={{ background: isSelected ? colors.secondary : colors.danger }} />}
-                </div>
+                </button>
               );
             })}
           </div>

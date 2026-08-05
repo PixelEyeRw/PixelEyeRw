@@ -1,26 +1,31 @@
 import React from "react";
-import { Search, Bell } from "lucide-react";
+import { Search, Bell, Menu } from "lucide-react";
 import { colors, fontBody } from "../lib/theme";
 
-export default function Topbar() {
+export default function Topbar({ onSidebarToggle, sidebarOpen }) {
   return (
     <div
-      className="flex items-center justify-between px-6 py-4"
+      className="flex flex-col gap-3 px-4 py-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between"
       style={{ background: colors.neutral, borderBottom: `1px solid ${colors.border}` }}
     >
-      <div
-        className="flex items-center gap-2 rounded px-3 py-2 w-80"
-        style={{ border: `1px solid ${colors.border}` }}
-      >
-        <Search size={14} color={colors.muted} />
-        <input
-          placeholder="Global operations search..."
-          className="text-sm outline-none w-full"
-          style={fontBody}
-        />
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={onSidebarToggle} aria-label="Toggle navigation" className="lg:hidden rounded p-2" style={{ border: `1px solid ${colors.border}` }}>
+          <Menu size={18} color={colors.primary} />
+        </button>
+        <label className="flex items-center gap-2 rounded px-3 py-2 flex-1 sm:flex-none sm:w-80" style={{ border: `1px solid ${colors.border}` }}>
+          <Search size={14} color={colors.muted} />
+          <input
+            aria-label="Search operations"
+            placeholder="Global operations search..."
+            className="text-sm outline-none w-full"
+            style={fontBody}
+          />
+        </label>
       </div>
-      <div className="flex items-center gap-4">
-        <Bell size={18} color={colors.primary} />
+      <div className="flex items-center justify-between gap-4 sm:justify-end">
+        <button type="button" aria-label="Notifications" className="rounded p-2" style={{ border: `1px solid ${colors.border}` }}>
+          <Bell size={18} color={colors.primary} />
+        </button>
         <div className="text-right">
           <div style={{ color: colors.primary, ...fontBody }} className="text-sm font-semibold">
             Sr. Producer

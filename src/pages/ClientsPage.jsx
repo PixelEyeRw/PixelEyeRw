@@ -59,16 +59,16 @@ export default function ClientsPage({ onNavigate }) {
   );
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-3xl font-bold">Clients</h1>
-        <div className="flex items-center gap-2 rounded px-3 py-2 w-72" style={{ border: `1px solid ${colors.border}` }}>
+    <div className="p-4 sm:p-6 space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-2xl sm:text-3xl font-bold">Clients</h1>
+        <label className="flex items-center gap-2 rounded px-3 py-2 w-full sm:w-72" style={{ border: `1px solid ${colors.border}` }}>
           <Search size={14} color={colors.muted} />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search clients..." className="text-sm outline-none w-full" />
-        </div>
+          <input aria-label="Search clients" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search clients..." className="text-sm outline-none w-full" />
+        </label>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {[
           { key: "all", label: "All" },
           { key: "on_track", label: "On Track" },
@@ -77,7 +77,9 @@ export default function ClientsPage({ onNavigate }) {
         ].map((f) => (
           <button
             key={f.key}
+            type="button"
             onClick={() => setFilter(f.key)}
+            aria-pressed={filter === f.key}
             className="text-xs font-semibold px-3 py-1.5 rounded"
             style={{
               border: `1px solid ${colors.primary}`,
@@ -90,8 +92,8 @@ export default function ClientsPage({ onNavigate }) {
         ))}
       </div>
 
-      <div className="rounded-lg" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-        <table className="w-full text-left text-sm">
+      <div className="rounded-lg overflow-x-auto" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+        <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr style={{ color: colors.muted }} className="text-xs uppercase">
               <th className="p-4">Client</th>
