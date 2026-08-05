@@ -1,6 +1,9 @@
 const PROFILE_STORAGE_KEY = "pixeleye-profile";
 const INVITES_STORAGE_KEY = "pixeleye-invites";
 const ACCOUNTS_STORAGE_KEY = "pixeleye-accounts";
+const SESSION_STORAGE_KEY = "pixeleye_session";
+const AM_ACKS_KEY = "pixeleye-am-acks";
+const TASKS_STORAGE_KEY = "pixeleye-tasks";
 
 export const defaultProfile = {
   name: "Ava Patel",
@@ -64,4 +67,56 @@ export function getStoredAccounts() {
 export function saveStoredAccounts(accounts) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+}
+
+export function saveSession(session) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+export function getSession() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+// AM acknowledgements for incoming assignments
+export function getAMAcknowledgements() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(AM_ACKS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveAMAcknowledgements(acks) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AM_ACKS_KEY, JSON.stringify(acks));
+}
+
+// Task storage (per-project tasks)
+export function getStoredTasks() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(TASKS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredTasks(tasks) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
 }
