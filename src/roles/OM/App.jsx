@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Gauge, Settings as SettingsIcon, PlusCircle } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
 import ReassignModal from "./components/ReassignModal";
 import DashboardPage from "../../pages/DashboardPage";
+import IntakePage from "../../pages/IntakePage";
 import ClientsPage from "../../pages/ClientsPage";
 import ProjectsPage from "../../pages/ProjectsPage";
 import CalendarPage from "../../pages/CalendarPage";
@@ -12,6 +14,17 @@ import SettingsPage from "../../pages/SettingsPage";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import { INITIAL_AMS, INITIAL_DELETED } from "../../lib/mockData";
 
+const OM_NAV_ITEMS = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "intake", label: "Intake", icon: PlusCircle },
+  { key: "clients", label: "Clients", icon: Users },
+  { key: "projects", label: "Projects", icon: Briefcase },
+  { key: "calendar", label: "Calendar", icon: CalendarDays },
+  { key: "reports", label: "Reports", icon: BarChart3 },
+  { key: "workload", label: "Workload", icon: Gauge },
+  { key: "settings", label: "Settings", icon: SettingsIcon },
+];
+
 export default function OMApp({ onSignOut, isDirector = false }) {
   const [page, setPage] = useState("dashboard");
   const [ams, setAms] = useState(INITIAL_AMS);
@@ -19,7 +32,7 @@ export default function OMApp({ onSignOut, isDirector = false }) {
   const [reassignTarget, setReassignTarget] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const handleIntake = (form) => console.log("POST /api/om/projects", form);
+  const handleIntake = () => setPage("intake");
   const handleRestore = (id) => setDeleted((prev) => prev.map((d) => (d.id === id ? { ...d, restored: true } : d)));
   const handleReassignConfirm = (targetId) => {
     setAms((prev) => {
@@ -37,7 +50,7 @@ export default function OMApp({ onSignOut, isDirector = false }) {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row" style={{ ...fontBody, background: "#FAF9F6" }}>
       <style>{GOOGLE_FONTS_IMPORT}</style>
-      <Sidebar active={page} onNavigate={setPage} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar active={page} onNavigate={setPage} navItems={OM_NAV_ITEMS} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
         <Topbar onSidebarToggle={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
         <div className="px-4 py-2 flex items-center justify-between">
@@ -51,8 +64,13 @@ export default function OMApp({ onSignOut, isDirector = false }) {
           </div>
         </div>
         {page === "dashboard" && (
-          <DashboardPage ams={ams} deleted={deleted} onIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
+          isDirector ? (
+            <DirectorDashboard ams={ams} deleted={deleted} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
+          ) : (
+            <DashboardPage ams={ams} deleted={deleted} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
+          )
         )}
+        {page === "intake" && <IntakePage />}
         {page === "clients" && <ClientsPage onNavigate={setPage} />}
         {page === "projects" && <ProjectsPage />}
         {page === "calendar" && <CalendarPage />}

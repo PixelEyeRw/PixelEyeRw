@@ -7,6 +7,7 @@ export function seedDev() {
         { id: 'account_om_1', name: 'Jordan Vance', email: 'jordan@studio.test', role: 'Operations Manager', password: 'pass' },
         { id: 'account_am_1', name: 'Elena Rossi', email: 'elena@studio.test', role: 'Account Manager', password: 'pass' },
         { id: 'account_prod_1', name: 'Sam Producer', email: 'sam@studio.test', role: 'Video Editor', password: 'pass' },
+        { id: 'account_dir_1', name: 'Avery Blake', email: 'avery@studio.test', role: 'Director', password: 'pass' },
       ];
       window.localStorage.setItem('pixeleye-accounts', JSON.stringify(accounts));
       console.info('PixelEye: seeded dev accounts (jordan/elena/sam with password "pass").');

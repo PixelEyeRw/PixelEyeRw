@@ -189,6 +189,7 @@ export default function SettingsPage() {
           <div>
             <label className="text-xs uppercase block mb-1" style={{ ...fontBody, color: colors.muted }}>Role</label>
             <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="w-full rounded p-2 text-sm" style={{ ...fontBody, border: `1px solid ${colors.border}` }}>
+              <option>Director</option>
               <option>Account Manager</option>
               <option>Content Lead</option>
               <option>Designer</option>

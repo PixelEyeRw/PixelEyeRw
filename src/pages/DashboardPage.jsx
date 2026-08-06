@@ -11,7 +11,7 @@ import {
 import { fontBody, fontDisplay, colors } from "../lib/theme";
 import { capacityStatus } from "../lib/status";
 
-export default function DashboardPage({ ams = [], deleted = [], onIntake = () => {}, onRestore = () => {}, onReassign = () => {} }) {
+export default function DashboardPage({ ams = [], deleted = [], onNewIntake = () => {}, onRestore = () => {}, onReassign = () => {} }) {
   const summary = useMemo(() => {
     const totalProjects = ams.reduce((sum, am) => sum + am.activeProjects, 0);
     const statusCounts = ams.reduce(
@@ -34,7 +34,7 @@ export default function DashboardPage({ ams = [], deleted = [], onIntake = () =>
   }, [ams]);
 
   const handleIntakeClick = () => {
-    onIntake({ title: "New Studio intake", note: "Capture a new client intake for launch planning.", requestedBy: "Operations Manager" });
+    onNewIntake();
   };
 
   return (

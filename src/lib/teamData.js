@@ -70,6 +70,23 @@ export function saveStoredAccounts(accounts) {
   window.localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
 }
 
+const INTAKES_STORAGE_KEY = "pixeleye-intakes";
+
+export function getStoredIntakes() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(INTAKES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredIntakes(intakes) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(INTAKES_STORAGE_KEY, JSON.stringify(intakes));
+}
+
 export function saveSession(session) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
