@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Gauge, Settings as SettingsIcon, PlusCircle } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Gauge, Settings as SettingsIcon, PlusCircle, ClipboardList } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
 import ReassignModal from "./components/ReassignModal";
 import DashboardPage from "../../pages/DashboardPage";
 import IntakePage from "../../pages/IntakePage";
+import OMTaskBoard from "../../pages/OMTaskBoard";
 import ClientsPage from "../../pages/ClientsPage";
 import ProjectsPage from "../../pages/ProjectsPage";
 import CalendarPage from "../../pages/CalendarPage";
@@ -12,11 +13,13 @@ import ReportsPage from "../../pages/ReportsPage";
 import WorkloadPage from "../../pages/WorkloadPage";
 import SettingsPage from "../../pages/SettingsPage";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
-import { INITIAL_AMS, INITIAL_DELETED } from "../../lib/mockData";
+import { INITIAL_AMS, INITIAL_DELETED, INITIAL_OM_TASK_BOARD } from "../../lib/mockData";
+import { getStoredOMTaskBoard, saveStoredOMTaskBoard } from "../../lib/teamData";
 
 const OM_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "intake", label: "Intake", icon: PlusCircle },
+  { key: "task-board", label: "Task Board", icon: ClipboardList },
   { key: "clients", label: "Clients", icon: Users },
   { key: "projects", label: "Projects", icon: Briefcase },
   { key: "calendar", label: "Calendar", icon: CalendarDays },
@@ -29,8 +32,24 @@ export default function OMApp({ onSignOut, isDirector = false }) {
   const [page, setPage] = useState("dashboard");
   const [ams, setAms] = useState(INITIAL_AMS);
   const [deleted, setDeleted] = useState(INITIAL_DELETED);
+  const [taskRows, setTaskRows] = useState([]);
   const [reassignTarget, setReassignTarget] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const storedRows = getStoredOMTaskBoard();
+    if (storedRows.length > 0) {
+      setTaskRows(storedRows);
+      return;
+    }
+    setTaskRows(INITIAL_OM_TASK_BOARD);
+    saveStoredOMTaskBoard(INITIAL_OM_TASK_BOARD);
+  }, []);
+
+  const handleTaskRowsChange = (nextRows) => {
+    setTaskRows(nextRows);
+    saveStoredOMTaskBoard(nextRows);
+  };
 
   const handleIntake = () => setPage("intake");
   const handleRestore = (id) => setDeleted((prev) => prev.map((d) => (d.id === id ? { ...d, restored: true } : d)));
@@ -65,12 +84,13 @@ export default function OMApp({ onSignOut, isDirector = false }) {
         </div>
         {page === "dashboard" && (
           isDirector ? (
-            <DirectorDashboard ams={ams} deleted={deleted} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
+            <DashboardPage ams={ams} deleted={deleted} taskRows={taskRows} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
           ) : (
-            <DashboardPage ams={ams} deleted={deleted} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
+            <DashboardPage ams={ams} deleted={deleted} taskRows={taskRows} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
           )
         )}
         {page === "intake" && <IntakePage />}
+        {page === "task-board" && <OMTaskBoard rows={taskRows} onRowsChange={handleTaskRowsChange} />}
         {page === "clients" && <ClientsPage onNavigate={setPage} />}
         {page === "projects" && <ProjectsPage />}
         {page === "calendar" && <CalendarPage />}

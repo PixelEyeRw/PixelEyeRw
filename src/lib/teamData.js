@@ -5,6 +5,12 @@ const SESSION_STORAGE_KEY = "pixeleye_session";
 const AM_ACKS_KEY = "pixeleye-am-acks";
 const TASKS_STORAGE_KEY = "pixeleye-tasks";
 const REPORTS_STORAGE_KEY = "pixeleye-reports";
+const OM_TASK_BOARD_KEY = "pixeleye-om-task-board";
+const AM_PROJECT_LIST_KEY = "pixeleye-am-project-list";
+const AM_TASK_PROGRESS_KEY = "pixeleye-am-task-progress";
+const AM_CLIENT_UPDATES_KEY = "pixeleye-am-client-updates";
+const AM_KPI_FLAGS_KEY = "pixeleye-am-kpi-flags";
+const AM_SELECTED_PROJECT_KEY = "pixeleye-am-selected-project";
 
 export const defaultProfile = {
   name: "Ava Patel",
@@ -152,4 +158,93 @@ export function getStoredReports() {
 export function saveStoredReports(reports) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(reports));
+}
+
+export function getStoredOMTaskBoard() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(OM_TASK_BOARD_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredOMTaskBoard(rows) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(OM_TASK_BOARD_KEY, JSON.stringify(rows));
+}
+
+export function getStoredAMProjectList() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(AM_PROJECT_LIST_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredAMProjectList(rows) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AM_PROJECT_LIST_KEY, JSON.stringify(rows));
+}
+
+export function getStoredAMTaskProgress() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(AM_TASK_PROGRESS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredAMTaskProgress(rows) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AM_TASK_PROGRESS_KEY, JSON.stringify(rows));
+}
+
+export function getStoredAMClientUpdates() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(AM_CLIENT_UPDATES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredAMClientUpdates(rows) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AM_CLIENT_UPDATES_KEY, JSON.stringify(rows));
+}
+
+export function getStoredAMKpiFlags() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(AM_KPI_FLAGS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredAMKpiFlags(flags) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AM_KPI_FLAGS_KEY, JSON.stringify(flags));
+}
+
+export function getStoredAMSelectedProject() {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(AM_SELECTED_PROJECT_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function saveStoredAMSelectedProject(projectId) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AM_SELECTED_PROJECT_KEY, projectId || "");
 }

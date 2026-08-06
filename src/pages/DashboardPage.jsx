@@ -11,7 +11,7 @@ import {
 import { fontBody, fontDisplay, colors } from "../lib/theme";
 import { capacityStatus } from "../lib/status";
 
-export default function DashboardPage({ ams = [], deleted = [], onNewIntake = () => {}, onRestore = () => {}, onReassign = () => {} }) {
+export default function DashboardPage({ ams = [], deleted = [], taskRows = [], onNewIntake = () => {}, onRestore = () => {}, onReassign = () => {} }) {
   const summary = useMemo(() => {
     const totalProjects = ams.reduce((sum, am) => sum + am.activeProjects, 0);
     const statusCounts = ams.reduce(
@@ -32,6 +32,26 @@ export default function DashboardPage({ ams = [], deleted = [], onNewIntake = ()
       averageLoad,
     };
   }, [ams]);
+
+  const liveSummary = useMemo(() => {
+    if (!taskRows.length) {
+      return {
+        activeClients: ams.reduce((sum, am) => sum + am.clients, 0),
+        liveProjects: summary.totalProjects,
+        overdueTasks: 0,
+        averageProgress: 0,
+      };
+    }
+    const activeClients = new Set(taskRows.map((row) => row.client)).size;
+    const liveProjects = new Set(taskRows.map((row) => row.projectId)).size;
+    const now = new Date();
+    const overdueTasks = taskRows.filter((row) => {
+      const deadline = new Date(row.deadline);
+      return !Number.isNaN(deadline.getTime()) && deadline < now && Number(row.progress) < 100 && row.status !== "Cancelled";
+    }).length;
+    const averageProgress = Math.round(taskRows.reduce((sum, row) => sum + (Number(row.progress) || 0), 0) / taskRows.length);
+    return { activeClients, liveProjects, overdueTasks, averageProgress };
+  }, [taskRows, ams, summary.totalProjects]);
 
   const handleIntakeClick = () => {
     onNewIntake();
@@ -61,24 +81,24 @@ export default function DashboardPage({ ams = [], deleted = [], onNewIntake = ()
 
       <div className="grid gap-4 xl:grid-cols-4">
         <div className="rounded-3xl p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Active account managers</div>
-          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{summary.totalAms}</div>
-          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>Current team capacity</div>
+          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Active clients</div>
+          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{liveSummary.activeClients}</div>
+          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>Derived from current task sheet</div>
         </div>
         <div className="rounded-3xl p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Total live projects</div>
-          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{summary.totalProjects}</div>
-          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>Across all AMs</div>
+          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Live projects</div>
+          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{liveSummary.liveProjects}</div>
+          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>In flight now</div>
         </div>
         <div className="rounded-3xl p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>High-load AMs</div>
-          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.secondary }}>{summary.highLoad}</div>
-          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>Close to capacity</div>
+          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Overdue tasks</div>
+          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.danger }}>{liveSummary.overdueTasks}</div>
+          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>Past deadline and not complete</div>
         </div>
         <div className="rounded-3xl p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Overloaded accounts</div>
-          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.danger }}>{summary.overloaded}</div>
-          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>Need reassignment</div>
+          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Average progress</div>
+          <div className="mt-4 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{liveSummary.averageProgress}%</div>
+          <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>Across all current tasks</div>
         </div>
       </div>
 
