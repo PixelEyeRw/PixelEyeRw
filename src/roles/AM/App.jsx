@@ -36,6 +36,18 @@ import {
 } from "../../lib/teamData";
 import { kpiSummary } from "../../lib/amWorkbook";
 
+function hasLegacyProjectValues(rows) {
+  return rows.some((row) => String(row.projectId || "").startsWith("P-"));
+}
+
+function hasLegacyTaskValues(rows) {
+  return rows.some((row) => String(row.projectId || "").startsWith("P-") || row.status === "Waiting Approval");
+}
+
+function hasLegacyClientValues(rows) {
+  return rows.some((row) => Number(row.satisfactionScore) === 9 && row.notes === "Example only");
+}
+
 const AM_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "clients", label: "Clients", icon: Users },
@@ -56,24 +68,27 @@ export default function AMApp({ onSignOut }) {
 
   useEffect(() => {
     const session = getSession();
-    const owner = session?.name || "Adelphe";
+    const owner = session?.name || "Elena Rossi";
 
     const storedProjects = getStoredAMProjectList();
+    const useStoredProjects = storedProjects.length > 0 && !hasLegacyProjectValues(storedProjects);
     const effectiveProjects = storedProjects.length
-      ? storedProjects
+      ? (useStoredProjects ? storedProjects : INITIAL_AM_PROJECT_LIST.filter((row) => row.accountOwner === owner))
       : INITIAL_AM_PROJECT_LIST.filter((row) => row.accountOwner === owner);
     setProjectRows(effectiveProjects);
-    if (!storedProjects.length) saveStoredAMProjectList(effectiveProjects);
+    if (!useStoredProjects) saveStoredAMProjectList(effectiveProjects);
 
     const storedTasks = getStoredAMTaskProgress();
-    const effectiveTasks = storedTasks.length ? storedTasks : INITIAL_AM_TASK_PROGRESS;
+    const useStoredTasks = storedTasks.length > 0 && !hasLegacyTaskValues(storedTasks);
+    const effectiveTasks = useStoredTasks ? storedTasks : INITIAL_AM_TASK_PROGRESS;
     setTaskRows(effectiveTasks);
-    if (!storedTasks.length) saveStoredAMTaskProgress(effectiveTasks);
+    if (!useStoredTasks) saveStoredAMTaskProgress(effectiveTasks);
 
     const storedUpdates = getStoredAMClientUpdates();
-    const effectiveUpdates = storedUpdates.length ? storedUpdates : INITIAL_AM_CLIENT_UPDATES;
+    const useStoredUpdates = storedUpdates.length > 0 && !hasLegacyClientValues(storedUpdates);
+    const effectiveUpdates = useStoredUpdates ? storedUpdates : INITIAL_AM_CLIENT_UPDATES;
     setClientUpdates(effectiveUpdates);
-    if (!storedUpdates.length) saveStoredAMClientUpdates(effectiveUpdates);
+    if (!useStoredUpdates) saveStoredAMClientUpdates(effectiveUpdates);
 
     const storedFlags = getStoredAMKpiFlags();
     if (storedFlags) {

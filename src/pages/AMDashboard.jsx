@@ -7,7 +7,7 @@ export default function AMDashboard({ summary, selectedProjectId, onSelectProjec
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl sm:text-3xl font-semibold" style={{ ...fontDisplay, color: colors.primary }}>Adelphe Account Dashboard</h1>
+      <h1 className="text-2xl sm:text-3xl font-semibold" style={{ ...fontDisplay, color: colors.primary }}>Account Dashboard</h1>
       <p style={{ ...fontBody, color: colors.muted }} className="mt-2">Client and project overview pulled from your AM workbook data.</p>
 
       <div className="mt-4 max-w-xl">

@@ -16,6 +16,10 @@ import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import { INITIAL_AMS, INITIAL_DELETED, INITIAL_OM_TASK_BOARD } from "../../lib/mockData";
 import { getStoredOMTaskBoard, saveStoredOMTaskBoard } from "../../lib/teamData";
 
+function hasLegacySheetValues(rows) {
+  return rows.some((row) => String(row.projectId || "").startsWith("P-"));
+}
+
 const OM_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "intake", label: "Intake", icon: PlusCircle },
@@ -38,7 +42,7 @@ export default function OMApp({ onSignOut, isDirector = false }) {
 
   useEffect(() => {
     const storedRows = getStoredOMTaskBoard();
-    if (storedRows.length > 0) {
+    if (storedRows.length > 0 && !hasLegacySheetValues(storedRows)) {
       setTaskRows(storedRows);
       return;
     }
