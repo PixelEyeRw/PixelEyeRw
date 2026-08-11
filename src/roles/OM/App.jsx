@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Gauge, Settings as SettingsIcon, PlusCircle, ClipboardList, Package, CheckSquare } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Gauge, Settings as SettingsIcon, PlusCircle, ClipboardList, Package } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
 import ReassignModal from "./components/ReassignModal";
@@ -13,7 +13,6 @@ import ReportsPage from "../../pages/ReportsPage";
 import WorkloadPage from "../../pages/WorkloadPage";
 import SettingsPage from "../../pages/SettingsPage";
 import DeliverablesPage from "../../pages/DeliverablesPage";
-import DailyTasksPage from "../../pages/DailyTasksPage";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import { INITIAL_AMS, INITIAL_DELETED, INITIAL_OM_TASK_BOARD } from "../../lib/mockData";
 import { getStoredOMTaskBoard, saveStoredOMTaskBoard } from "../../lib/teamData";
@@ -25,9 +24,8 @@ function hasLegacySheetValues(rows) {
 const OM_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "intake", label: "Intake", icon: PlusCircle },
-  { key: "task-board", label: "Task Board", icon: ClipboardList },
+  { key: "task-board", label: "Team Daily Tasks", icon: ClipboardList },
   { key: "deliverables", label: "Deliverables", icon: Package },
-  { key: "daily-tasks", label: "Daily Tasks", icon: CheckSquare },
   { key: "clients", label: "Clients", icon: Users },
   { key: "projects", label: "Projects", icon: Briefcase },
   { key: "calendar", label: "Calendar", icon: CalendarDays },
@@ -100,7 +98,6 @@ export default function OMApp({ onSignOut, isDirector = false }) {
         {page === "intake" && <IntakePage />}
         {page === "task-board" && <OMTaskBoard rows={taskRows} onRowsChange={handleTaskRowsChange} />}
         {page === "deliverables" && <DeliverablesPage />}
-        {page === "daily-tasks" && <DailyTasksPage />}
         {page === "clients" && <ClientsPage onNavigate={setPage} />}
         {page === "projects" && <ProjectsPage />}
         {page === "calendar" && <CalendarPage />}

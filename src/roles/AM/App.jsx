@@ -54,7 +54,7 @@ function hasLegacyClientValues(rows) {
 
 const AM_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { key: "task-board", label: "Task Board", icon: Clipboard },
+  { key: "task-board", label: "My Daily Tasks", icon: Clipboard },
   { key: "clients", label: "Clients", icon: Users },
   { key: "projects", label: "Projects", icon: Briefcase },
   { key: "calendar", label: "Calendar", icon: CalendarDays },

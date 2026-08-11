@@ -10,7 +10,7 @@ import { INITIAL_OM_TASK_BOARD } from "../../lib/mockData";
 import { getStoredOMTaskBoard, saveStoredOMTaskBoard } from "../../lib/teamData";
 
 const PRODUCTION_NAV_ITEMS = [
-  { key: "mytasks", label: "My Tasks", icon: Gauge },
+  { key: "mytasks", label: "My Daily Tasks", icon: Gauge },
   { key: "reports", label: "Reports", icon: BarChart3 },
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ];

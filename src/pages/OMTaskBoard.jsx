@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { colors, fontBody, fontDisplay } from "../lib/theme";
-import { getSession } from "../lib/teamData";
+import { getSession, getStoredDailyTasks, saveStoredDailyTasks } from "../lib/teamData";
+import { CheckCircle, Clock, Plus, X, ExternalLink, MessageSquare } from "lucide-react";
 
 const STATUS_OPTIONS = ["Not Started", "In Progress", "Client Review", "Completed", "On Hold", "Cancelled"];
 const PRIORITY_OPTIONS = ["High", "Medium", "Low"];
@@ -29,13 +30,41 @@ function rowTone(status) {
 export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [newTaskText, setNewTaskText] = useState("");
+  const [completingTaskId, setCompletingTaskId] = useState(null);
+  const [completionComment, setCompletionComment] = useState("");
+  const [completionLink, setCompletionLink] = useState("");
 
   // Get current user session
   const session = getSession();
   const isOM = session?.role === "Operations Manager";
   const currentUser = session?.name;
+  const currentUserId = session?.email || currentUser;
 
-  // Filter by owner for non-OM users
+  // Get daily tasks from localStorage
+  const dailyTasks = useMemo(() => {
+    if (typeof window === "undefined") return [];
+    return getStoredDailyTasks();
+  }, []);
+
+  // Filter daily tasks for current user
+  const myDailyTasks = useMemo(() => {
+    if (isOM) return dailyTasks; // OM sees all
+    return dailyTasks.filter((task) => task.employeeName === currentUser || task.employeeId === currentUserId);
+  }, [dailyTasks, currentUser, currentUserId, isOM]);
+
+  // Separate active and completed tasks
+  const activeTasks = useMemo(() => {
+    return myDailyTasks.filter((task) => task.status !== "done");
+  }, [myDailyTasks]);
+
+  const completedTasks = useMemo(() => {
+    return myDailyTasks
+      .filter((task) => task.status === "done")
+      .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+  }, [myDailyTasks]);
+
+  // Filter by owner for non-OM users (for project tasks)
   const ownerFilteredRows = useMemo(() => {
     if (isOM || !currentUser) return rows;
     return rows.filter((row) => row.owner === currentUser);
@@ -56,18 +85,81 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   }, [ownerFilteredRows, query, statusFilter]);
 
   const summary = useMemo(() => {
-    const activeClients = new Set(ownerFilteredRows.map((row) => row.client)).size;
-    const liveProjects = new Set(ownerFilteredRows.map((row) => row.projectId)).size;
-    const today = new Date();
-    const overdueTasks = ownerFilteredRows.filter((row) => {
-      const d = new Date(row.deadline);
-      return !Number.isNaN(d.getTime()) && d < today && row.progress < 100 && row.status !== "Cancelled";
-    }).length;
-    const averageProgress = ownerFilteredRows.length
-      ? Math.round(ownerFilteredRows.reduce((sum, row) => sum + (Number(row.progress) || 0), 0) / ownerFilteredRows.length)
-      : 0;
-    return { activeClients, liveProjects, overdueTasks, averageProgress };
-  }, [ownerFilteredRows]);
+    const total = activeTasks.length;
+    const completed = completedTasks.length;
+    const inProgress = activeTasks.filter((t) => t.status === "in-progress").length;
+    
+    return { total, completed, inProgress };
+  }, [activeTasks, completedTasks]);
+
+  const handleAddTask = () => {
+    if (!newTaskText.trim()) return;
+    
+    const newTask = {
+      id: `dt_${Date.now()}`,
+      employeeId: currentUserId,
+      employeeName: currentUser,
+      date: new Date().toISOString().split("T")[0],
+      task: newTaskText.trim(),
+      status: "in-progress",
+      comment: "",
+      createdAt: new Date().toISOString(),
+      completedAt: null,
+    };
+
+    const allTasks = getStoredDailyTasks();
+    saveStoredDailyTasks([...allTasks, newTask]);
+    setNewTaskText("");
+    window.location.reload(); // Refresh to show new task
+  };
+
+  const handleStartCompleting = (taskId) => {
+    setCompletingTaskId(taskId);
+    setCompletionComment("");
+    setCompletionLink("");
+  };
+
+  const handleCancelCompleting = () => {
+    setCompletingTaskId(null);
+    setCompletionComment("");
+    setCompletionLink("");
+  };
+
+  const handleConfirmComplete = () => {
+    if (!completionComment.trim() && !completionLink.trim()) {
+      alert("Please provide either a comment or a link before marking as done.");
+      return;
+    }
+
+    const allTasks = getStoredDailyTasks();
+    const updatedTasks = allTasks.map((task) => {
+      if (task.id === completingTaskId) {
+        return {
+          ...task,
+          status: "done",
+          comment: completionComment.trim() || task.comment,
+          submissionLink: completionLink.trim(),
+          completedAt: new Date().toISOString(),
+        };
+      }
+      return task;
+    });
+
+    saveStoredDailyTasks(updatedTasks);
+    setCompletingTaskId(null);
+    setCompletionComment("");
+    setCompletionLink("");
+    window.location.reload(); // Refresh to show updated tasks
+  };
+
+  const handleDeleteTask = (taskId) => {
+    if (!confirm("Are you sure you want to delete this task?")) return;
+    
+    const allTasks = getStoredDailyTasks();
+    const updatedTasks = allTasks.filter((task) => task.id !== taskId);
+    saveStoredDailyTasks(updatedTasks);
+    window.location.reload(); // Refresh to show updated list
+  };
 
   const updateRow = (rowId, field, value) => {
     onRowsChange(
@@ -86,161 +178,232 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold" style={{ ...fontDisplay, color: colors.primary }}>
-          {isOM ? "Current Task Sheet" : "My Task Sheet"}
+          {isOM ? "Team Daily Tasks" : "My Daily Tasks"}
         </h1>
         <p className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>
           {isOM 
-            ? "Live operations sheet for all in-flight work. Updating status, progress, or approvals here instantly updates OM metrics."
-            : "Your personal task sheet showing all tasks assigned to you. Update status, progress, and approvals to keep your team informed."}
+            ? "View and monitor all team member daily tasks and their progress."
+            : "Add your daily tasks, track your progress, and mark them complete with updates."}
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Active Clients</div>
-          <div className="mt-2 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{summary.activeClients}</div>
+          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Active Tasks</div>
+          <div className="mt-2 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{summary.total}</div>
         </div>
         <div className="rounded-lg p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Live Projects</div>
-          <div className="mt-2 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{summary.liveProjects}</div>
+          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>In Progress</div>
+          <div className="mt-2 text-3xl font-bold" style={{ ...fontBody, color: colors.warn }}>{summary.inProgress}</div>
         </div>
         <div className="rounded-lg p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Overdue Tasks</div>
-          <div className="mt-2 text-3xl font-bold" style={{ ...fontBody, color: colors.danger }}>{summary.overdueTasks}</div>
-        </div>
-        <div className="rounded-lg p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Average Progress</div>
-          <div className="mt-2 text-3xl font-bold" style={{ ...fontBody, color: colors.primary }}>{summary.averageProgress}%</div>
+          <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Completed Today</div>
+          <div className="mt-2 text-3xl font-bold" style={{ ...fontBody, color: colors.onTrack }}>{summary.completed}</div>
         </div>
       </div>
 
+      {/* Add New Task Section */}
+      {!isOM && (
+        <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+          <h3 className="text-sm font-semibold mb-3" style={{ ...fontBody, color: colors.primary }}>Add New Task</h3>
+          <div className="flex gap-2">
+            <input
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddTask();
+              }}
+              placeholder="What are you working on today?"
+              className="flex-1 rounded px-3 py-2 text-sm"
+              style={{ border: `1px solid ${colors.border}`, ...fontBody }}
+            />
+            <button
+              onClick={handleAddTask}
+              disabled={!newTaskText.trim()}
+              className="flex items-center gap-2 rounded px-4 py-2 text-sm font-semibold"
+              style={{
+                background: newTaskText.trim() ? colors.primary : colors.border,
+                color: colors.neutral,
+                ...fontBody,
+                opacity: newTaskText.trim() ? 1 : 0.5,
+                cursor: newTaskText.trim() ? "pointer" : "not-allowed",
+              }}
+            >
+              <Plus size={16} /> Add Task
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Tasks List */}
       <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by project, client, owner, or task"
-            className="w-full lg:max-w-md rounded px-3 py-2 text-sm"
-            style={{ border: `1px solid ${colors.border}`, ...fontBody }}
-          />
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="rounded px-3 py-2 text-sm"
-            style={{ border: `1px solid ${colors.border}`, ...fontBody }}
-          >
-            <option value="all">All statuses</option>
-            {STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-[1200px] w-full text-sm" style={{ ...fontBody }}>
-            <thead>
-              <tr style={{ background: colors.primary, color: colors.neutral }}>
-                {[
-                  "Project ID",
-                  "Client",
-                  "Project",
-                  "Stage",
-                  "Main Task",
-                  "Owner",
-                  "Support",
-                  "Priority",
-                  "Status",
-                  "Progress",
-                  "Deadline",
-                  "Approval",
-                  "Overall",
-                ].map((heading) => (
-                  <th key={heading} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{heading}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((row) => {
-                const overallStatus = buildOverallStatus(row);
-                const tone = rowTone(overallStatus);
-                return (
-                  <tr key={row.id} className="border-b" style={{ borderColor: colors.border }}>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.projectId}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.client}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.project}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.taskStage}</td>
-                    <td className="px-3 py-2 min-w-[220px]">{row.mainTask}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.owner}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{row.support}</td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={row.priority}
-                        onChange={(event) => updateRow(row.id, "priority", event.target.value)}
-                        className="rounded px-2 py-1 text-xs"
-                        style={{ border: `1px solid ${colors.border}` }}
-                      >
-                        {PRIORITY_OPTIONS.map((item) => (
-                          <option key={item} value={item}>{item}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={row.status}
-                        onChange={(event) => updateRow(row.id, "status", event.target.value)}
-                        className="rounded px-2 py-1 text-xs"
-                        style={{ border: `1px solid ${colors.border}` }}
-                      >
-                        {STATUS_OPTIONS.map((item) => (
-                          <option key={item} value={item}>{item}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={row.progress}
-                        onChange={(event) => updateRow(row.id, "progress", event.target.value)}
-                        className="w-20 rounded px-2 py-1 text-xs"
-                        style={{ border: `1px solid ${colors.border}` }}
-                      />
-                      <span className="ml-1">%</span>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <input
-                        type="date"
-                        value={row.deadline}
-                        onChange={(event) => updateRow(row.id, "deadline", event.target.value)}
-                        className="rounded px-2 py-1 text-xs"
-                        style={{ border: `1px solid ${colors.border}` }}
-                      />
-                    </td>
-                    <td className="px-3 py-2">
-                      <select
-                        value={row.approvalStatus}
-                        onChange={(event) => updateRow(row.id, "approvalStatus", event.target.value)}
-                        className="rounded px-2 py-1 text-xs"
-                        style={{ border: `1px solid ${colors.border}` }}
-                      >
-                        {APPROVAL_OPTIONS.map((item) => (
-                          <option key={item} value={item}>{item}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span className="rounded-full px-2 py-1 text-xs font-semibold" style={{ background: tone.bg, color: tone.text }}>
-                        {overallStatus}
+        <h3 className="text-lg font-semibold mb-4" style={{ ...fontBody, color: colors.primary }}>
+          {isOM ? "Active Team Tasks" : "My Active Tasks"} ({activeTasks.length})
+        </h3>
+        <div className="space-y-3">
+          {activeTasks.length === 0 ? (
+            <p className="text-sm text-center py-8" style={{ ...fontBody, color: colors.muted }}>
+              {isOM ? "No active tasks from team members" : "No active tasks. Add your first task above!"}
+            </p>
+          ) : (
+            activeTasks.map((task) => (
+              <div
+                key={task.id}
+                className="rounded-lg p-4"
+                style={{ background: "#FAF9F6", border: `1px solid ${colors.border}` }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock size={16} color={colors.warn} />
+                      <span className="text-sm font-semibold" style={{ ...fontBody, color: colors.primary }}>
+                        {task.task}
                       </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                    {isOM && (
+                      <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
+                        <strong>{task.employeeName}</strong> • {new Date(task.createdAt).toLocaleString()}
+                      </div>
+                    )}
+                    {!isOM && (
+                      <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
+                        Added: {new Date(task.createdAt).toLocaleString()}
+                      </div>
+                    )}
+                    
+                    {completingTaskId === task.id ? (
+                      <div className="mt-3 space-y-2">
+                        <div>
+                          <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>
+                            Comment / Update *
+                          </label>
+                          <textarea
+                            value={completionComment}
+                            onChange={(e) => setCompletionComment(e.target.value)}
+                            placeholder="Describe what you completed or any notes..."
+                            rows={2}
+                            className="w-full rounded px-3 py-2 text-sm"
+                            style={{ border: `1px solid ${colors.border}`, ...fontBody }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>
+                            Link (optional)
+                          </label>
+                          <input
+                            value={completionLink}
+                            onChange={(e) => setCompletionLink(e.target.value)}
+                            placeholder="https://... (link to deliverable, document, etc.)"
+                            className="w-full rounded px-3 py-2 text-sm"
+                            style={{ border: `1px solid ${colors.border}`, ...fontBody }}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleConfirmComplete}
+                            className="flex items-center gap-2 rounded px-3 py-1.5 text-xs font-semibold"
+                            style={{ background: colors.onTrack, color: colors.neutral, ...fontBody }}
+                          >
+                            <CheckCircle size={14} /> Confirm Complete
+                          </button>
+                          <button
+                            onClick={handleCancelCompleting}
+                            className="flex items-center gap-2 rounded px-3 py-1.5 text-xs font-semibold"
+                            style={{ border: `1px solid ${colors.border}`, color: colors.primary, ...fontBody }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2 mt-2">
+                        {!isOM && (
+                          <>
+                            <button
+                              onClick={() => handleStartCompleting(task.id)}
+                              className="flex items-center gap-2 rounded px-3 py-1.5 text-xs font-semibold"
+                              style={{ background: colors.onTrack, color: colors.neutral, ...fontBody }}
+                            >
+                              <CheckCircle size={14} /> Mark as Done
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTask(task.id)}
+                              className="flex items-center gap-2 rounded px-3 py-1.5 text-xs font-semibold"
+                              style={{ border: `1px solid ${colors.danger}`, color: colors.danger, ...fontBody }}
+                            >
+                              <X size={14} /> Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
+
+      {/* Completed Tasks History */}
+      {completedTasks.length > 0 && (
+        <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+          <h3 className="text-lg font-semibold mb-4" style={{ ...fontBody, color: colors.primary }}>
+            Completed History ({completedTasks.length})
+          </h3>
+          <div className="space-y-3">
+            {completedTasks.map((task) => (
+              <div
+                key={task.id}
+                className="rounded-lg p-4"
+                style={{ background: "#EAF6EE", border: `1px solid ${colors.onTrack}` }}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle size={16} color={colors.onTrack} />
+                      <span className="text-sm font-semibold" style={{ ...fontBody, color: colors.primary }}>
+                        {task.task}
+                      </span>
+                    </div>
+                    {isOM && (
+                      <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
+                        <strong>{task.employeeName}</strong>
+                      </div>
+                    )}
+                    <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
+                      Completed: {task.completedAt ? new Date(task.completedAt).toLocaleString() : "N/A"}
+                    </div>
+                    {task.comment && (
+                      <div className="mt-2 p-2 rounded text-xs" style={{ background: "#fff", border: `1px solid ${colors.border}`, ...fontBody }}>
+                        <div className="flex items-center gap-1 mb-1" style={{ color: colors.muted }}>
+                          <MessageSquare size={12} />
+                          <span className="font-semibold">Comment:</span>
+                        </div>
+                        {task.comment}
+                      </div>
+                    )}
+                    {task.submissionLink && (
+                      <div className="mt-2">
+                        <a
+                          href={task.submissionLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs font-semibold"
+                          style={{ color: colors.primary, ...fontBody }}
+                        >
+                          <ExternalLink size={12} />
+                          View Submission
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
