@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { ArrowLeftRight, Video, Palette, PenTool, Film } from "lucide-react";
+import { ArrowLeftRight, Video, Palette, PenTool, Film, AlertTriangle } from "lucide-react";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
-import { capacityStatus } from "../lib/status";
+import { capacityStatus, clientWorkloadStatus } from "../lib/status";
 import { PRODUCTION_ROLES } from "../lib/mockData";
 
 const ICONS = { Video, Palette, PenTool, Film };
@@ -42,17 +42,46 @@ export default function WorkloadPage({ ams, onReassign }) {
           {ams.map((am) => {
             const pct = am.activeProjects / am.capacityMax;
             const status = capacityStatus(pct);
+            const clientStatus = clientWorkloadStatus(am.clients);
+            const showClientWarning = clientStatus.flag !== "optimal";
+            
             return (
               <div key={am.id} className="rounded-lg p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
                 <div className="flex items-center justify-between mb-2">
                   <div style={{ ...fontBody, color: colors.primary }} className="font-semibold text-sm">{am.name}</div>
                   <span className="text-xs font-semibold px-2 py-0.5 rounded" style={{ background: status.color, color: colors.neutral, ...fontBody }}>{status.label}</span>
                 </div>
-                <div style={{ color: colors.muted, ...fontBody }} className="text-xs mb-3">{am.activeProjects} / {am.capacityMax} active projects</div>
+                <div style={{ color: colors.muted, ...fontBody }} className="text-xs mb-1">{am.activeProjects} / {am.capacityMax} active projects</div>
+                
+                {/* Client Count with Threshold Flag */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div style={{ color: colors.muted, ...fontBody }} className="text-xs">
+                    {am.clients} clients
+                  </div>
+                  {showClientWarning && (
+                    <div className="flex items-center gap-1">
+                      <AlertTriangle size={12} color={clientStatus.color} />
+                      <span className="text-xs font-semibold" style={{ color: clientStatus.color, ...fontBody }}>
+                        {clientStatus.label}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                
                 <div className="w-full rounded-full h-2 mb-3" style={{ background: colors.tertiary }}>
                   <div className="h-2 rounded-full" style={{ width: `${Math.min(pct, 1) * 100}%`, background: status.color }} />
                 </div>
-                {pct >= 1 && (
+                
+                {/* Warning message for client thresholds */}
+                {showClientWarning && (
+                  <div className="rounded p-2 mb-3 text-xs" style={{ background: `${clientStatus.color}15`, border: `1px solid ${clientStatus.color}`, ...fontBody, color: colors.primary }}>
+                    {clientStatus.flag === "overload" 
+                      ? `Client count exceeds maximum of 5 (optimal: 3-5)` 
+                      : `Client count below minimum of 3 (optimal: 3-5)`}
+                  </div>
+                )}
+                
+                {(pct >= 1 || showClientWarning) && (
                   <button
                     onClick={() => onReassign(am)}
                     className="flex items-center justify-center gap-2 w-full rounded py-1.5 text-xs font-semibold"

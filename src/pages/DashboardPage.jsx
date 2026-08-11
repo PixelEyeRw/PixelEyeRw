@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import { fontBody, fontDisplay, colors } from "../lib/theme";
 import { capacityStatus } from "../lib/status";
+import EmployeeCards from "../components/EmployeeCards";
+import { TEAM_MEMBERS, INITIAL_DAILY_TASKS, PROJECTS } from "../lib/mockData";
+import { getStoredDailyTasks } from "../lib/teamData";
 
 export default function DashboardPage({ ams = [], deleted = [], taskRows = [], onNewIntake = () => {}, onRestore = () => {}, onReassign = () => {} }) {
   const summary = useMemo(() => {
@@ -215,6 +218,13 @@ export default function DashboardPage({ ams = [], deleted = [], taskRows = [], o
           </div>
         </div>
       </div>
+
+      {/* Employee Cards Section */}
+      <EmployeeCards 
+        employees={TEAM_MEMBERS} 
+        dailyTasks={typeof window !== "undefined" ? getStoredDailyTasks() : INITIAL_DAILY_TASKS} 
+        projects={PROJECTS} 
+      />
     </div>
   );
 }

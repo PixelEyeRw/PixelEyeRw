@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { colors, fontBody, fontDisplay } from "../lib/theme";
+import { getSession } from "../lib/teamData";
 
 const STATUS_OPTIONS = ["Not Started", "In Progress", "Client Review", "Completed", "On Hold", "Cancelled"];
 const PRIORITY_OPTIONS = ["High", "Medium", "Low"];
@@ -29,9 +30,20 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Get current user session
+  const session = getSession();
+  const isOM = session?.role === "Operations Manager";
+  const currentUser = session?.name;
+
+  // Filter by owner for non-OM users
+  const ownerFilteredRows = useMemo(() => {
+    if (isOM || !currentUser) return rows;
+    return rows.filter((row) => row.owner === currentUser);
+  }, [rows, isOM, currentUser]);
+
   const filteredRows = useMemo(() => {
     const q = query.toLowerCase().trim();
-    return rows.filter((row) => {
+    return ownerFilteredRows.filter((row) => {
       const matchesQuery =
         row.projectId.toLowerCase().includes(q) ||
         row.client.toLowerCase().includes(q) ||
@@ -41,21 +53,21 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       const matchesStatus = statusFilter === "all" || row.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [rows, query, statusFilter]);
+  }, [ownerFilteredRows, query, statusFilter]);
 
   const summary = useMemo(() => {
-    const activeClients = new Set(rows.map((row) => row.client)).size;
-    const liveProjects = new Set(rows.map((row) => row.projectId)).size;
+    const activeClients = new Set(ownerFilteredRows.map((row) => row.client)).size;
+    const liveProjects = new Set(ownerFilteredRows.map((row) => row.projectId)).size;
     const today = new Date();
-    const overdueTasks = rows.filter((row) => {
+    const overdueTasks = ownerFilteredRows.filter((row) => {
       const d = new Date(row.deadline);
       return !Number.isNaN(d.getTime()) && d < today && row.progress < 100 && row.status !== "Cancelled";
     }).length;
-    const averageProgress = rows.length
-      ? Math.round(rows.reduce((sum, row) => sum + (Number(row.progress) || 0), 0) / rows.length)
+    const averageProgress = ownerFilteredRows.length
+      ? Math.round(ownerFilteredRows.reduce((sum, row) => sum + (Number(row.progress) || 0), 0) / ownerFilteredRows.length)
       : 0;
     return { activeClients, liveProjects, overdueTasks, averageProgress };
-  }, [rows]);
+  }, [ownerFilteredRows]);
 
   const updateRow = (rowId, field, value) => {
     onRowsChange(
@@ -73,9 +85,13 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold" style={{ ...fontDisplay, color: colors.primary }}>Current Task Sheet</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold" style={{ ...fontDisplay, color: colors.primary }}>
+          {isOM ? "Current Task Sheet" : "My Task Sheet"}
+        </h1>
         <p className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>
-          Live operations sheet for all in-flight work. Updating status, progress, or approvals here instantly updates OM metrics.
+          {isOM 
+            ? "Live operations sheet for all in-flight work. Updating status, progress, or approvals here instantly updates OM metrics."
+            : "Your personal task sheet showing all tasks assigned to you. Update status, progress, and approvals to keep your team informed."}
         </p>
       </div>
 

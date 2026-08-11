@@ -11,6 +11,8 @@ const AM_TASK_PROGRESS_KEY = "pixeleye-am-task-progress";
 const AM_CLIENT_UPDATES_KEY = "pixeleye-am-client-updates";
 const AM_KPI_FLAGS_KEY = "pixeleye-am-kpi-flags";
 const AM_SELECTED_PROJECT_KEY = "pixeleye-am-selected-project";
+const DAILY_TASKS_STORAGE_KEY = "pixeleye-daily-tasks";
+const DELIVERABLES_STORAGE_KEY = "pixeleye-deliverables";
 
 export const defaultProfile = {
   name: "Ava Patel",
@@ -248,3 +250,36 @@ export function saveStoredAMSelectedProject(projectId) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(AM_SELECTED_PROJECT_KEY, projectId || "");
 }
+
+// Daily tasks storage
+export function getStoredDailyTasks() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(DAILY_TASKS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredDailyTasks(tasks) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DAILY_TASKS_STORAGE_KEY, JSON.stringify(tasks));
+}
+
+// Enhanced deliverables storage
+export function getStoredDeliverables() {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(DELIVERABLES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveStoredDeliverables(deliverables) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(DELIVERABLES_STORAGE_KEY, JSON.stringify(deliverables));
+}
+

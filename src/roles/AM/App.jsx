@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Settings as SettingsIcon } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Settings as SettingsIcon, Clipboard } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
 import AMDashboard from "../../pages/AMDashboard";
@@ -14,12 +14,14 @@ import ReportsPage from "../../pages/ReportsPage";
 import SettingsPage from "../../pages/SettingsPage";
 import AMIncoming from "../../pages/AMIncoming";
 import AMDailyPlanner from "../../pages/AMDailyPlanner";
+import OMTaskBoard from "../../pages/OMTaskBoard";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import {
   INITIAL_AM_PROJECT_LIST,
   INITIAL_AM_TASK_PROGRESS,
   INITIAL_AM_CLIENT_UPDATES,
   INITIAL_AM_KPI_FLAGS,
+  INITIAL_OM_TASK_BOARD,
 } from "../../lib/mockData";
 import {
   getSession,
@@ -33,6 +35,8 @@ import {
   saveStoredAMKpiFlags,
   getStoredAMSelectedProject,
   saveStoredAMSelectedProject,
+  getStoredOMTaskBoard,
+  saveStoredOMTaskBoard,
 } from "../../lib/teamData";
 import { kpiSummary } from "../../lib/amWorkbook";
 
@@ -50,6 +54,7 @@ function hasLegacyClientValues(rows) {
 
 const AM_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "task-board", label: "Task Board", icon: Clipboard },
   { key: "clients", label: "Clients", icon: Users },
   { key: "projects", label: "Projects", icon: Briefcase },
   { key: "calendar", label: "Calendar", icon: CalendarDays },
@@ -65,6 +70,7 @@ export default function AMApp({ onSignOut }) {
   const [clientUpdates, setClientUpdates] = useState([]);
   const [kpiFlags, setKpiFlags] = useState(INITIAL_AM_KPI_FLAGS);
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [taskBoardRows, setTaskBoardRows] = useState([]);
 
   useEffect(() => {
     const session = getSession();
@@ -101,6 +107,14 @@ export default function AMApp({ onSignOut }) {
     const defaultProject = effectiveProjects[0]?.projectId || "";
     setSelectedProjectId(selected || defaultProject);
     if (!selected) saveStoredAMSelectedProject(defaultProject);
+
+    const storedTaskBoard = getStoredOMTaskBoard();
+    if (storedTaskBoard.length > 0) {
+      setTaskBoardRows(storedTaskBoard);
+    } else {
+      setTaskBoardRows(INITIAL_OM_TASK_BOARD);
+      saveStoredOMTaskBoard(INITIAL_OM_TASK_BOARD);
+    }
   }, []);
 
   const workbookSummary = useMemo(
@@ -145,6 +159,11 @@ export default function AMApp({ onSignOut }) {
     saveStoredAMSelectedProject(projectId);
   };
 
+  const handleTaskBoardRowsChange = (nextRows) => {
+    setTaskBoardRows(nextRows);
+    saveStoredOMTaskBoard(nextRows);
+  };
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row" style={{ ...fontBody, background: "#FAF9F6" }}>
       <style>{GOOGLE_FONTS_IMPORT}</style>
@@ -173,6 +192,7 @@ export default function AMApp({ onSignOut }) {
             projects={projectRows}
           />
         )}
+        {page === "task-board" && <OMTaskBoard rows={taskBoardRows} onRowsChange={handleTaskBoardRowsChange} />}
         {page === "clients" && <ClientsPage onNavigate={setPage} />}
         {page === "projects" && <ProjectsPage />}
         {page === "calendar" && <CalendarPage />}

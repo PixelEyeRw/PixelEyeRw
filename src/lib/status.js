@@ -16,3 +16,10 @@ export function healthBadge(status) {
 export function statusBadge(status) {
   return healthBadge(status);
 }
+
+// Client workload thresholds: 3-5 clients per AM
+export function clientWorkloadStatus(clientCount) {
+  if (clientCount > 5) return { label: "OVERLOAD", color: colors.danger, flag: "overload" };
+  if (clientCount < 3) return { label: "LOW", color: colors.warn, flag: "low" };
+  return { label: "OPTIMAL", color: colors.onTrack, flag: "optimal" };
+}
