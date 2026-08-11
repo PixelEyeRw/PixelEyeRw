@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { colors, fontBody, fontDisplay } from "../lib/theme";
 import { getSession, getStoredDailyTasks, saveStoredDailyTasks } from "../lib/teamData";
-import { CheckCircle, Clock, Plus, X, ExternalLink, MessageSquare } from "lucide-react";
+import { CheckCircle, Clock, Plus, X, ExternalLink, MessageSquare, Briefcase } from "lucide-react";
+import { PROJECTS } from "../lib/mockData";
 
 const STATUS_OPTIONS = ["Not Started", "In Progress", "Client Review", "Completed", "On Hold", "Cancelled"];
 const PRIORITY_OPTIONS = ["High", "Medium", "Low"];
@@ -31,6 +32,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [newTaskText, setNewTaskText] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState("");
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [completionComment, setCompletionComment] = useState("");
   const [completionLink, setCompletionLink] = useState("");
@@ -94,6 +96,12 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
 
   const handleAddTask = () => {
     if (!newTaskText.trim()) return;
+    if (!selectedProjectId) {
+      alert("Please select a project for this task.");
+      return;
+    }
+    
+    const selectedProject = PROJECTS.find((p) => p.id === selectedProjectId);
     
     const newTask = {
       id: `dt_${Date.now()}`,
@@ -101,6 +109,8 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       employeeName: currentUser,
       date: new Date().toISOString().split("T")[0],
       task: newTaskText.trim(),
+      projectId: selectedProjectId,
+      projectName: selectedProject ? selectedProject.title : "",
       status: "in-progress",
       comment: "",
       createdAt: new Date().toISOString(),
@@ -110,6 +120,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     const allTasks = getStoredDailyTasks();
     saveStoredDailyTasks([...allTasks, newTask]);
     setNewTaskText("");
+    setSelectedProjectId("");
     window.location.reload(); // Refresh to show new task
   };
 
@@ -206,31 +217,56 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       {!isOM && (
         <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
           <h3 className="text-sm font-semibold mb-3" style={{ ...fontBody, color: colors.primary }}>Add New Task</h3>
-          <div className="flex gap-2">
-            <input
-              value={newTaskText}
-              onChange={(e) => setNewTaskText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddTask();
-              }}
-              placeholder="What are you working on today?"
-              className="flex-1 rounded px-3 py-2 text-sm"
-              style={{ border: `1px solid ${colors.border}`, ...fontBody }}
-            />
-            <button
-              onClick={handleAddTask}
-              disabled={!newTaskText.trim()}
-              className="flex items-center gap-2 rounded px-4 py-2 text-sm font-semibold"
-              style={{
-                background: newTaskText.trim() ? colors.primary : colors.border,
-                color: colors.neutral,
-                ...fontBody,
-                opacity: newTaskText.trim() ? 1 : 0.5,
-                cursor: newTaskText.trim() ? "pointer" : "not-allowed",
-              }}
-            >
-              <Plus size={16} /> Add Task
-            </button>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>
+                Select Project *
+              </label>
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="w-full rounded px-3 py-2 text-sm"
+                style={{ border: `1px solid ${colors.border}`, ...fontBody }}
+              >
+                <option value="">-- Choose a project --</option>
+                {PROJECTS.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.title} ({project.client})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>
+                Task Description *
+              </label>
+              <div className="flex gap-2">
+                <input
+                  value={newTaskText}
+                  onChange={(e) => setNewTaskText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddTask();
+                  }}
+                  placeholder="What are you working on today?"
+                  className="flex-1 rounded px-3 py-2 text-sm"
+                  style={{ border: `1px solid ${colors.border}`, ...fontBody }}
+                />
+                <button
+                  onClick={handleAddTask}
+                  disabled={!newTaskText.trim() || !selectedProjectId}
+                  className="flex items-center gap-2 rounded px-4 py-2 text-sm font-semibold"
+                  style={{
+                    background: (newTaskText.trim() && selectedProjectId) ? colors.primary : colors.border,
+                    color: colors.neutral,
+                    ...fontBody,
+                    opacity: (newTaskText.trim() && selectedProjectId) ? 1 : 0.5,
+                    cursor: (newTaskText.trim() && selectedProjectId) ? "pointer" : "not-allowed",
+                  }}
+                >
+                  <Plus size={16} /> Add Task
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -260,6 +296,14 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
                         {task.task}
                       </span>
                     </div>
+                    {task.projectName && (
+                      <div className="flex items-center gap-1 mb-2">
+                        <Briefcase size={12} color={colors.muted} />
+                        <span className="text-xs font-semibold" style={{ ...fontBody, color: colors.muted }}>
+                          {task.projectName}
+                        </span>
+                      </div>
+                    )}
                     {isOM && (
                       <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
                         <strong>{task.employeeName}</strong> • {new Date(task.createdAt).toLocaleString()}
@@ -366,6 +410,14 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
                         {task.task}
                       </span>
                     </div>
+                    {task.projectName && (
+                      <div className="flex items-center gap-1 mb-2">
+                        <Briefcase size={12} color={colors.muted} />
+                        <span className="text-xs font-semibold" style={{ ...fontBody, color: colors.muted }}>
+                          {task.projectName}
+                        </span>
+                      </div>
+                    )}
                     {isOM && (
                       <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
                         <strong>{task.employeeName}</strong>
