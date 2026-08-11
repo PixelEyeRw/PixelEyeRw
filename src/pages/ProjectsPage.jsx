@@ -127,7 +127,7 @@ export default function ProjectsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState(null);
 
   const visibleProjects = useMemo(() => {
-    const base = session?.role === "AM" ? PROJECTS.filter((project) => project.am === session.name) : PROJECTS;
+    const base = session?.role === "Account Manager" ? PROJECTS.filter((project) => project.am === session.name) : PROJECTS;
     return base.filter((project) => {
       const searchValue = query.toLowerCase().trim();
       const matchesQuery =
@@ -158,10 +158,10 @@ export default function ProjectsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 style={{ ...fontDisplay, color: colors.primary }} className="text-2xl sm:text-3xl font-bold">
-            {session?.role === "AM" ? "My Projects" : "Projects"}
+            {session?.role === "Account Manager" ? "My Projects" : "Projects"}
           </h1>
           <p style={{ ...fontBody, color: colors.muted }} className="mt-2 max-w-2xl text-sm">
-            {session?.role === "AM"
+            {session?.role === "Account Manager"
               ? "Track your assigned work, delivery status, and next milestones."
               : "Studio-level project portfolio and delivery status across clients."}
           </p>
