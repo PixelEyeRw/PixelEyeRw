@@ -27,7 +27,9 @@ export default function AMTaskProgressPage({ rows = [], onRowsChange = () => {} 
                 "Client",
                 "Project",
                 "Stage",
+                "Deliverable",
                 "Main Task",
+                "Role",
                 "Owner",
                 "Status",
                 "Progress",
@@ -46,8 +48,12 @@ export default function AMTaskProgressPage({ rows = [], onRowsChange = () => {} 
                 <td className="px-3 py-2 whitespace-nowrap">{row.client}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{row.project}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{row.stage}</td>
-                <td className="px-3 py-2 min-w-[260px]">{row.mainTask}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{row.owner}</td>
+                <td className="px-3 py-2 min-w-[220px]">{row.deliverableName || row.mainTask}</td>
+                <td className="px-3 py-2 min-w-[260px]">
+                  <input value={row.mainTask} onChange={(event) => updateRow(row.id, "mainTask", event.target.value)} className="w-full rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}` }} />
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">{row.role || "-"}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{row.owner || "Unassigned"}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   <select value={row.status} onChange={(event) => updateRow(row.id, "status", event.target.value)} className="rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}` }}>
                     {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}

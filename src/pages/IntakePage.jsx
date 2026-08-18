@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PlusCircle, ClipboardList, FileText, CheckCircle2, CalendarDays } from "lucide-react";
 import { fontBody, fontDisplay, colors } from "../lib/theme";
-import { getSession, getStoredIntakes, saveStoredIntakes } from "../lib/teamData";
+import { getSession, getStoredIntakes, saveStoredIntakes, getStoredAMProjectSubmissions, saveStoredAMProjectSubmissions } from "../lib/teamData";
 
 export default function IntakePage() {
   const [session, setSession] = useState(null);
@@ -11,11 +11,23 @@ export default function IntakePage() {
   const [priority, setPriority] = useState("medium");
   const [notes, setNotes] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [projectSubmissions, setProjectSubmissions] = useState([]);
 
   useEffect(() => {
     setSession(getSession());
     setIntakes(getStoredIntakes());
+    setProjectSubmissions(getStoredAMProjectSubmissions());
   }, []);
+
+  const updateSubmissionStatus = (submissionId, status) => {
+    const next = projectSubmissions.map((submission) => (
+      submission.id === submissionId
+        ? { ...submission, status, reviewedBy: session?.name || "Operations Manager", reviewedAt: new Date().toISOString() }
+        : submission
+    ));
+    setProjectSubmissions(next);
+    saveStoredAMProjectSubmissions(next);
+  };
 
   const saveIntakes = (next) => {
     saveStoredIntakes(next);
@@ -192,6 +204,40 @@ export default function IntakePage() {
           </div>
         </div>
       </div>
+
+      <section className="rounded-3xl p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold" style={{ ...fontBody, color: colors.primary }}>AM project submissions</h2>
+            <p className="mt-1 text-sm" style={{ ...fontBody, color: colors.muted }}>Approve a submitted project to make it visible in the AM Project List and generate its Project Progress rows.</p>
+          </div>
+        </div>
+        <div className="mt-4 space-y-3">
+          {projectSubmissions.length === 0 ? (
+            <p className="text-sm" style={{ ...fontBody, color: colors.muted }}>No AM project submissions awaiting review.</p>
+          ) : projectSubmissions.map((submission) => (
+            <div key={submission.id} className="rounded-2xl p-4" style={{ background: colors.tertiary, border: `1px solid ${colors.border}` }}>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="font-semibold" style={{ ...fontBody, color: colors.primary }}>{submission.project}</div>
+                  <div className="text-sm" style={{ ...fontBody, color: colors.muted }}>{submission.client} · {submission.submittedBy} · {submission.deliverables.length} deliverables</div>
+                  <div className="mt-2 text-sm" style={{ ...fontBody, color: colors.primary }}>{submission.objective}</div>
+                  {submission.attachmentName && <div className="mt-1 text-xs" style={{ ...fontBody, color: colors.muted }}>Attachment: {submission.attachmentName}</div>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full px-2 py-1 text-xs font-semibold" style={{ background: submission.status === "Approved" ? colors.onTrack : submission.status === "Rejected" ? colors.danger : colors.warn, color: colors.neutral }}>{submission.status}</span>
+                  {submission.status === "Pending Review" && (
+                    <>
+                      <button type="button" onClick={() => updateSubmissionStatus(submission.id, "Rejected")} className="rounded px-3 py-2 text-xs font-semibold" style={{ border: `1px solid ${colors.danger}`, color: colors.danger }}>Reject</button>
+                      <button type="button" onClick={() => updateSubmissionStatus(submission.id, "Approved")} className="rounded px-3 py-2 text-xs font-semibold" style={{ background: colors.primary, color: colors.neutral }}>Approve</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

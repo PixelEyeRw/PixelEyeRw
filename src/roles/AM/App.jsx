@@ -7,13 +7,13 @@ import AMProjectList from "../../pages/AMProjectList";
 import AMTaskProgressPage from "../../pages/AMTaskProgressPage";
 import AMClientUpdatesPage from "../../pages/AMClientUpdatesPage";
 import AMKpiBonusPage from "../../pages/AMKpiBonusPage";
+import AMNewProjectPage from "../../pages/AMNewProjectPage";
 import ClientsPage from "../../pages/ClientsPage";
 import ProjectsPage from "../../pages/ProjectsPage";
 import CalendarPage from "../../pages/CalendarPage";
 import ReportsPage from "../../pages/ReportsPage";
 import SettingsPage from "../../pages/SettingsPage";
 import AMIncoming from "../../pages/AMIncoming";
-import AMDailyPlanner from "../../pages/AMDailyPlanner";
 import OMTaskBoard from "../../pages/OMTaskBoard";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import {
@@ -37,6 +37,7 @@ import {
   saveStoredAMSelectedProject,
   getStoredOMTaskBoard,
   saveStoredOMTaskBoard,
+  getStoredAMProjectSubmissions,
 } from "../../lib/teamData";
 import { kpiSummary } from "../../lib/amWorkbook";
 
@@ -72,23 +73,65 @@ export default function AMApp({ onSignOut }) {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [taskBoardRows, setTaskBoardRows] = useState([]);
 
+  const approvedSubmissionData = (submissions, owner) => {
+    const approved = submissions.filter((submission) => submission.status === "Approved" && submission.submittedBy === owner);
+    return {
+      projects: approved.map((submission) => ({
+        id: submission.id,
+        projectId: submission.projectId,
+        client: submission.client,
+        project: submission.project,
+        accountOwner: submission.submittedBy,
+        projectLead: submission.deliverables[0]?.assignee || submission.submittedBy,
+        startDate: submission.submittedAt.slice(0, 10),
+        targetDeadline: submission.deadline || submission.deliverables.reduce((latest, item) => item.deadline > latest ? item.deadline : latest, ""),
+        priority: submission.priority,
+        riskLevel: "Low",
+        overallStatus: "In Progress",
+        taskStage: submission.deliverables[0]?.stage || "Deliverables",
+        revenueSource: 0,
+        costSource: 0,
+      })),
+      tasks: approved.flatMap((submission) => submission.deliverables.map((item) => ({
+        id: item.id,
+        projectId: submission.projectId,
+        client: submission.client,
+        project: submission.project,
+        stage: item.stage,
+        deliverableName: item.name,
+        mainTask: item.mainTask || item.name,
+        role: item.role,
+        owner: item.assignee || item.customAssignee || "Unassigned",
+        status: item.status || "Not Started",
+        progress: item.progress || 0,
+        deadline: item.deadline,
+        approvalStatus: item.approvalStatus || "Not Required",
+        nextAction: item.nextAction || "Begin deliverable",
+        deliverableId: item.id,
+      }))),
+    };
+  };
+
   useEffect(() => {
     const session = getSession();
     const owner = session?.name || "Elena Rossi";
+    const submissionData = approvedSubmissionData(getStoredAMProjectSubmissions(), owner);
 
     const storedProjects = getStoredAMProjectList();
     const useStoredProjects = storedProjects.length > 0 && !hasLegacyProjectValues(storedProjects);
     const effectiveProjects = storedProjects.length
       ? (useStoredProjects ? storedProjects : INITIAL_AM_PROJECT_LIST.filter((row) => row.accountOwner === owner))
       : INITIAL_AM_PROJECT_LIST.filter((row) => row.accountOwner === owner);
-    setProjectRows(effectiveProjects);
-    if (!useStoredProjects) saveStoredAMProjectList(effectiveProjects);
+    const mergedProjects = [...effectiveProjects, ...submissionData.projects.filter((row) => !effectiveProjects.some((existing) => existing.projectId === row.projectId))];
+    setProjectRows(mergedProjects);
+    if (!useStoredProjects || submissionData.projects.length) saveStoredAMProjectList(mergedProjects);
 
     const storedTasks = getStoredAMTaskProgress();
     const useStoredTasks = storedTasks.length > 0 && !hasLegacyTaskValues(storedTasks);
     const effectiveTasks = useStoredTasks ? storedTasks : INITIAL_AM_TASK_PROGRESS;
-    setTaskRows(effectiveTasks);
-    if (!useStoredTasks) saveStoredAMTaskProgress(effectiveTasks);
+    const mergedTasks = [...effectiveTasks, ...submissionData.tasks.filter((row) => !effectiveTasks.some((existing) => existing.id === row.id))];
+    setTaskRows(mergedTasks);
+    if (!useStoredTasks || submissionData.tasks.length) saveStoredAMTaskProgress(mergedTasks);
 
     const storedUpdates = getStoredAMClientUpdates();
     const useStoredUpdates = storedUpdates.length > 0 && !hasLegacyClientValues(storedUpdates);
@@ -173,7 +216,7 @@ export default function AMApp({ onSignOut }) {
         <div className="px-4 py-2 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setPage("incoming")} className={`rounded px-3 py-2 text-sm font-semibold ${page==="incoming"?"opacity-100":"opacity-80"}`} style={{ border: `1px solid ${colors.border}` }}>Incoming</button>
-            <button onClick={() => setPage("daily")} className={`rounded px-3 py-2 text-sm font-semibold ${page==="daily"?"opacity-100":"opacity-80"}`} style={{ border: `1px solid ${colors.border}` }}>Daily Planner</button>
+            <button onClick={() => setPage("new-project")} className={`rounded px-3 py-2 text-sm font-semibold ${page==="new-project"?"opacity-100":"opacity-80"}`} style={{ border: `1px solid ${colors.border}` }}>New Project</button>
             <button onClick={() => setPage("project-list")} className={`rounded px-3 py-2 text-sm font-semibold ${page==="project-list"?"opacity-100":"opacity-80"}`} style={{ border: `1px solid ${colors.border}` }}>Project List</button>
             <button onClick={() => setPage("task-progress")} className={`rounded px-3 py-2 text-sm font-semibold ${page==="task-progress"?"opacity-100":"opacity-80"}`} style={{ border: `1px solid ${colors.border}` }}>Task Progress</button>
             <button onClick={() => setPage("client-updates")} className={`rounded px-3 py-2 text-sm font-semibold ${page==="client-updates"?"opacity-100":"opacity-80"}`} style={{ border: `1px solid ${colors.border}` }}>Client Updates</button>
@@ -199,7 +242,7 @@ export default function AMApp({ onSignOut }) {
         {page === "reports" && <ReportsPage />}
         {page === "settings" && <SettingsPage />}
         {page === "incoming" && <AMIncoming />}
-        {page === "daily" && <AMDailyPlanner />}
+        {page === "new-project" && <AMNewProjectPage onSubmitted={() => setPage("new-project")} />}
         {page === "project-list" && <AMProjectList rows={projectRows} onRowsChange={handleProjectRowsChange} />}
         {page === "task-progress" && <AMTaskProgressPage rows={taskRows} onRowsChange={handleTaskRowsChange} />}
         {page === "client-updates" && <AMClientUpdatesPage rows={clientUpdates} onRowsChange={handleClientUpdatesChange} />}

@@ -13,6 +13,7 @@ const AM_KPI_FLAGS_KEY = "pixeleye-am-kpi-flags";
 const AM_SELECTED_PROJECT_KEY = "pixeleye-am-selected-project";
 const DAILY_TASKS_STORAGE_KEY = "pixeleye-daily-tasks";
 const DELIVERABLES_STORAGE_KEY = "pixeleye-deliverables";
+const AM_PROJECT_SUBMISSIONS_KEY = "pixeleye-am-project-submissions";
 
 export const defaultProfile = {
   name: "Ava Patel",
@@ -281,5 +282,20 @@ export function getStoredDeliverables() {
 export function saveStoredDeliverables(deliverables) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(DELIVERABLES_STORAGE_KEY, JSON.stringify(deliverables));
+}
+
+export function getStoredAMProjectSubmissions() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(AM_PROJECT_SUBMISSIONS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredAMProjectSubmissions(submissions) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(AM_PROJECT_SUBMISSIONS_KEY, JSON.stringify(submissions));
 }
 

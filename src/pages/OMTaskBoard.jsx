@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { colors, fontBody, fontDisplay } from "../lib/theme";
 import { getSession, getStoredDailyTasks, saveStoredDailyTasks } from "../lib/teamData";
 import { CheckCircle, Clock, Plus, X, ExternalLink, MessageSquare, Briefcase } from "lucide-react";
-import { PROJECTS } from "../lib/mockData";
+import { PROJECTS, PRODUCTION_ROLES, TEAM_MEMBERS } from "../lib/mockData";
 
 const STATUS_OPTIONS = ["Not Started", "In Progress", "Client Review", "Completed", "On Hold", "Cancelled"];
 const PRIORITY_OPTIONS = ["High", "Medium", "Low"];
@@ -33,6 +33,9 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [newTaskText, setNewTaskText] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedRole, setSelectedRole] = useState(PRODUCTION_ROLES[0]?.name || "");
+  const [selectedAssignee, setSelectedAssignee] = useState("");
+  const [manualAssignee, setManualAssignee] = useState("");
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [completionComment, setCompletionComment] = useState("");
   const [completionLink, setCompletionLink] = useState("");
@@ -100,6 +103,11 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       alert("Please select a project for this task.");
       return;
     }
+    const assignee = selectedAssignee === "custom" ? manualAssignee.trim() : selectedAssignee;
+    if (!selectedRole || !assignee) {
+      alert("Please select a role and assigned person, or enter the person's name.");
+      return;
+    }
     
     const selectedProject = PROJECTS.find((p) => p.id === selectedProjectId);
     
@@ -111,6 +119,8 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       task: newTaskText.trim(),
       projectId: selectedProjectId,
       projectName: selectedProject ? selectedProject.title : "",
+      role: selectedRole,
+      assignedTo: assignee,
       status: "in-progress",
       comment: "",
       createdAt: new Date().toISOString(),
@@ -121,6 +131,8 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     saveStoredDailyTasks([...allTasks, newTask]);
     setNewTaskText("");
     setSelectedProjectId("");
+    setSelectedAssignee("");
+    setManualAssignee("");
     window.location.reload(); // Refresh to show new task
   };
 
@@ -218,6 +230,21 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
         <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
           <h3 className="text-sm font-semibold mb-3" style={{ ...fontBody, color: colors.primary }}>Add New Task</h3>
           <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>Assign Role *</label>
+              <select value={selectedRole} onChange={(event) => { setSelectedRole(event.target.value); setSelectedAssignee(""); }} className="w-full rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}`, ...fontBody }}>
+                {PRODUCTION_ROLES.map((role) => <option key={role.id} value={role.name}>{role.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>Assigned Person *</label>
+              <select value={selectedAssignee} onChange={(event) => setSelectedAssignee(event.target.value)} className="w-full rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}`, ...fontBody }}>
+                <option value="">-- Select person --</option>
+                {TEAM_MEMBERS.filter((member) => member.role.toLowerCase() === selectedRole.toLowerCase()).map((member) => <option key={member.id} value={member.name}>{member.name}</option>)}
+                <option value="custom">Type a name manually</option>
+              </select>
+              {selectedAssignee === "custom" && <input value={manualAssignee} onChange={(event) => setManualAssignee(event.target.value)} placeholder="Assigned person's name" className="mt-2 w-full rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}`, ...fontBody }} />}
+            </div>
             <div>
               <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>
                 Select Project *
