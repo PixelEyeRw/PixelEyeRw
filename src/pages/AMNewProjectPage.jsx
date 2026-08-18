@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { colors, fontBody, fontDisplay } from "../lib/theme";
 import { getSession, getStoredAMProjectSubmissions, saveStoredAMProjectSubmissions } from "../lib/teamData";
-import { PRODUCTION_ROLES, TEAM_MEMBERS } from "../lib/mockData";
+import { CLIENTS, PRODUCTION_ROLES, TEAM_MEMBERS } from "../lib/mockData";
 
 const emptyDeliverable = () => ({
   id: `deliverable_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -98,7 +98,20 @@ export default function AMNewProjectPage({ onSubmitted = () => {} }) {
         <section className="rounded-xl p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
           <h2 className="text-lg font-semibold" style={{ ...fontBody, color: colors.primary }}>Project details</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Field label="Client" value={client} onChange={setClient} placeholder="Client name" />
+            <label className="space-y-1 text-sm" style={fontBody}>
+              <span className="text-xs uppercase font-semibold" style={{ color: colors.muted }}>Client</span>
+              <select
+                value={client}
+                onChange={(event) => setClient(event.target.value)}
+                className="w-full rounded p-2"
+                style={{ border: `1px solid ${colors.border}` }}
+              >
+                <option value="">Select an existing client</option>
+                {CLIENTS.map((item) => (
+                  <option key={item.id} value={item.name}>{item.name}</option>
+                ))}
+              </select>
+            </label>
             <Field label="Project name" value={project} onChange={setProject} placeholder="Project title" />
             <Field label="Objective" value={objective} onChange={setObjective} placeholder="What should this project achieve?" />
             <Field label="Target deadline" type="date" value={deadline} onChange={setDeadline} />
