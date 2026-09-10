@@ -165,10 +165,18 @@ export const profile = {
   avatar: '',
 };
 
-export const invites = [];
-export const accounts = [];
-export const intakes = [];
-export const reports = [];
+export const invites = [
+  { id: 'invite_1', email: 'new@studio.test', role: 'Account Manager', createdAt: new Date().toISOString(), status: 'Pending' },
+];
+
+export const accounts = [
+  { id: 'account_om_1', name: 'Jordan Vance', email: 'jordan@studio.test', role: 'Operations Manager', password: 'pass' },
+  { id: 'account_am_1', name: 'Elena Rossi', email: 'elena@studio.test', role: 'Account Manager', password: 'pass' },
+  { id: 'account_prod_1', name: 'Sam Producer', email: 'sam@studio.test', role: 'Video Editor', password: 'pass' },
+  { id: 'account_dir_1', name: 'Avery Blake', email: 'avery@studio.test', role: 'Director', password: 'pass' },
+];
+
+export const intakes = [];export const reports = [];
 export const session = null;
 
 export function createId(prefix = 'item') {
