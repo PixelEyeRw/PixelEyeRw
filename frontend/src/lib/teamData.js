@@ -292,14 +292,8 @@ export function saveStoredDeliverables(deliverables) {
   window.localStorage.setItem(DELIVERABLES_STORAGE_KEY, JSON.stringify(deliverables));
 }
 
-export function getStoredAMProjectSubmissions() {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(AM_PROJECT_SUBMISSIONS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+export async function getStoredAMProjectSubmissions() {
+  return fetchJsonWithLocalFallback("/am/project-submissions", AM_PROJECT_SUBMISSIONS_KEY, []);
 }
 
 export function saveStoredAMProjectSubmissions(submissions) {
@@ -317,7 +311,14 @@ export async function apiRequest(path, options = {}) {
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const text = await response.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      message = parsed.message || text;
+    } catch {
+      // response wasn't JSON; use raw text
+    }
     throw new Error(message || `Request failed for ${path}`);
   }
 

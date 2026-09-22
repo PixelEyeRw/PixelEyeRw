@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PlusCircle, ClipboardList, FileText, CheckCircle2, CalendarDays } from "lucide-react";
 import { fontBody, fontDisplay, colors } from "../lib/theme";
-import { getSession, getStoredIntakes, saveStoredIntakes, getStoredAMProjectSubmissions, saveStoredAMProjectSubmissions } from "../lib/teamData";
+import { getSession, getStoredIntakes, saveStoredIntakes, getStoredAMProjectSubmissions, apiPut } from "../lib/teamData";
 
 export default function IntakePage() {
   const [session, setSession] = useState(null);
@@ -24,13 +24,16 @@ export default function IntakePage() {
   }, []);
 
   const updateSubmissionStatus = async (submissionId, status) => {
-    const next = projectSubmissions.map((submission) => (
-      submission.id === submissionId
-        ? { ...submission, status, reviewedBy: session?.name || "Operations Manager", reviewedAt: new Date().toISOString() }
-        : submission
-    ));
-    setProjectSubmissions(next);
-    saveStoredAMProjectSubmissions(next);
+    try {
+      const updated = await apiPut(`/am/project-submissions/${submissionId}`, {
+        status,
+        reviewedById: session?.id,
+        reviewedBy: session?.name || "Operations Manager",
+      });
+      setProjectSubmissions((current) => current.map((submission) => (submission.id === submissionId ? updated : submission)));
+    } catch (error) {
+      setStatusMessage(error.message || "Could not update this submission.");
+    }
   };
 
   const saveIntakes = (next) => {

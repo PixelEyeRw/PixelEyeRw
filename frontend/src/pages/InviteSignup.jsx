@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { fontBody, colors } from "../lib/theme";
-import { getStoredAccounts, getStoredInvites, saveStoredAccounts, saveStoredInvites } from "../lib/teamData";
+import { getStoredInvites, saveStoredInvites, apiPost } from "../lib/teamData";
 
 export default function InviteSignup({ token, onComplete }) {
   const [invites, setInvites] = useState([]);
   const [invite, setInvite] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "", role: "" });
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const storedInvites = getStoredInvites();
@@ -18,22 +19,27 @@ export default function InviteSignup({ token, onComplete }) {
     }
   }, [token]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!form.name || !form.email || !form.password || form.password !== form.confirmPassword) {
       setMessage("Please complete your details and confirm the password.");
       return;
     }
 
-    const accounts = getStoredAccounts();
-    const updatedAccounts = [...accounts, { id: `account_${Date.now()}`, name: form.name, email: form.email, role: form.role || "Team Member", password: form.password }];
-    saveStoredAccounts(updatedAccounts);
+    setSubmitting(true);
+    try {
+      await apiPost("/auth/signup", { name: form.name, email: form.email, password: form.password, role: form.role || "Production" });
 
-    const nextInvites = invites.map((item) => (item.id === token ? { ...item, status: "Accepted" } : item));
-    setInvites(nextInvites);
-    saveStoredInvites(nextInvites);
-    setMessage("Account created successfully. You can now continue to the dashboard.");
-    onComplete();
+      const nextInvites = invites.map((item) => (item.id === token ? { ...item, status: "Accepted" } : item));
+      setInvites(nextInvites);
+      saveStoredInvites(nextInvites);
+      setMessage("Account created successfully. You can now continue to the dashboard.");
+      onComplete();
+    } catch (error) {
+      setMessage(error.message || "Could not create your account.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

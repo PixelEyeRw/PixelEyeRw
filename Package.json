@@ -11,10 +11,14 @@
     "server": "node backend/server/index.js",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "db:migrate": "node backend/server/migrate.js",
-    "db:check": "node backend/server/check-db.js"
+    "db:check": "node backend/server/check-db.js",
+    "db:seed-users": "node backend/server/seed-users.js",
+    "db:seed-domain": "node backend/server/seed-domain.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
+    "dotenv": "^18.0.2",
     "express": "^4.21.2",
     "lucide-react": "^0.383.0",
     "pg": "^8.23.0",

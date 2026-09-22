@@ -1,22 +1,24 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
 import {
   amKpiFlags,
   amProjectList,
-  amProjectSubmissions,
   amTaskProgress,
   amClientUpdates,
   ams,
-  clients,
   profile,
-  projects,
   projectDeliverables,
   taskBoard,
-  accounts,
   invites,
   intakes,
   createId,
 } from './data.js';
+import { createUser, findUserByEmail, listUsers, toPublicUser } from './repositories/users.js';
+import { listClients, findClientById, findClientByName, createClient } from './repositories/clients.js';
+import { listProjects, findProjectById, createProject, updateProject } from './repositories/projects.js';
+import { listSubmissions, findSubmissionById, createSubmission, updateSubmissionStatus, approveSubmission } from './repositories/submissions.js';
+import { listDeliverablesByProject } from './repositories/deliverables.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -36,37 +38,53 @@ app.get('/api/health', (req, res) => {
 // AUTHENTICATION
 // ============================================================================
 
-app.get('/api/accounts', (req, res) => {
-  res.json(accounts);
+app.get('/api/accounts', async (req, res, next) => {
+  try {
+    const users = await listUsers();
+    res.json(users.map(toPublicUser));
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body || {};
-  const match = accounts.find((a) => a.email === email && a.password === password);
-  if (!match) {
-    return res.status(401).json({ message: 'Invalid email or password' });
+app.post('/api/auth/login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+    const passwordMatches = await bcrypt.compare(password, user.password_hash);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+    res.json(toPublicUser(user));
+  } catch (error) {
+    next(error);
   }
-  res.json(match);
 });
 
-app.post('/api/auth/signup', (req, res) => {
-  const { email, password, name, role } = req.body || {};
-  if (!email || !password || !name) {
-    return res.status(400).json({ message: 'Missing required fields' });
+app.post('/api/auth/signup', async (req, res, next) => {
+  try {
+    const { email, password, name, role } = req.body || {};
+    if (!email || !password || !name) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+    const validRoles = ['Operations Manager', 'Account Manager', 'Production', 'Director'];
+    const resolvedRole = validRoles.includes(role) ? role : 'Production';
+    const existing = await findUserByEmail(email);
+    if (existing) {
+      return res.status(409).json({ message: 'Account already exists' });
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    const newUser = await createUser({ name, email, passwordHash, role: resolvedRole, title: role && !validRoles.includes(role) ? role : undefined });
+    res.status(201).json(toPublicUser(newUser));
+  } catch (error) {
+    next(error);
   }
-  const existing = accounts.find((a) => a.email === email);
-  if (existing) {
-    return res.status(409).json({ message: 'Account already exists' });
-  }
-  const newAccount = {
-    id: createId('account'),
-    email,
-    password,
-    name,
-    role: role || 'Production',
-  };
-  accounts.push(newAccount);
-  res.status(201).json(newAccount);
 });
 
 // ============================================================================
@@ -100,58 +118,95 @@ app.get('/api/om/account-managers/:id', (req, res) => {
 // OM: CLIENTS
 // ============================================================================
 
-app.get('/api/om/clients', (req, res) => {
-  res.json(clients);
+app.get('/api/om/clients', async (req, res, next) => {
+  try {
+    res.json(await listClients());
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.get('/api/om/clients/:id', (req, res) => {
-  const client = clients.find((c) => c.id === req.params.id);
-  if (!client) return res.status(404).json({ message: 'Client not found' });
-  res.json(client);
+app.get('/api/om/clients/:id', async (req, res, next) => {
+  try {
+    const client = await findClientById(req.params.id);
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+    res.json(client);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post('/api/om/clients', (req, res) => {
-  const newClient = {
-    id: createId('client'),
-    ...req.body,
-  };
-  clients.push(newClient);
-  res.status(201).json(newClient);
+app.post('/api/om/clients', async (req, res, next) => {
+  try {
+    const { name, accountManagerId, health } = req.body || {};
+    if (!name) return res.status(400).json({ message: 'Client name is required' });
+    const existing = await findClientByName(name);
+    if (existing) return res.status(409).json({ message: 'Client already exists' });
+    const newClient = await createClient({ name, accountManagerId, health });
+    res.status(201).json(newClient);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================================
 // OM: PROJECTS
 // ============================================================================
 
-app.get('/api/om/projects', (req, res) => {
-  res.json(projects);
+app.get('/api/om/projects', async (req, res, next) => {
+  try {
+    res.json(await listProjects());
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.get('/api/om/projects/:id', (req, res) => {
-  const project = projects.find((p) => p.id === req.params.id);
-  if (!project) return res.status(404).json({ message: 'Project not found' });
-  res.json(project);
+app.get('/api/om/projects/:id', async (req, res, next) => {
+  try {
+    const project = await findProjectById(req.params.id);
+    if (!project) return res.status(404).json({ message: 'Project not found' });
+    res.json(project);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.get('/api/om/projects/:id/deliverables', (req, res) => {
-  const { id } = req.params;
-  res.json(projectDeliverables[id] || []);
+app.get('/api/om/projects/:id/deliverables', async (req, res, next) => {
+  try {
+    const rows = await listDeliverablesByProject(req.params.id);
+    if (rows.length) return res.json(rows);
+    res.json(projectDeliverables[req.params.id] || []);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post('/api/om/projects', (req, res) => {
-  const newProject = {
-    id: createId('project'),
-    ...req.body,
-  };
-  projects.push(newProject);
-  res.status(201).json(newProject);
+app.post('/api/om/projects', async (req, res, next) => {
+  try {
+    const { title, clientId, clientName, accountManagerId, priority, status, progress, startDate, targetDeadline } = req.body || {};
+    if (!title) return res.status(400).json({ message: 'Project title is required' });
+    let resolvedClientId = clientId;
+    if (!resolvedClientId && clientName) {
+      const client = await findClientByName(clientName);
+      if (!client) return res.status(400).json({ message: 'Client not found' });
+      resolvedClientId = client.id;
+    }
+    if (!resolvedClientId) return res.status(400).json({ message: 'clientId or clientName is required' });
+    const newProject = await createProject({ title, clientId: resolvedClientId, accountManagerId, priority, status, progress, startDate, targetDeadline });
+    res.status(201).json(newProject);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.put('/api/om/projects/:id', (req, res) => {
-  const index = projects.findIndex((p) => p.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Project not found' });
-  projects[index] = { ...projects[index], ...req.body };
-  res.json(projects[index]);
+app.put('/api/om/projects/:id', async (req, res, next) => {
+  try {
+    const updated = await updateProject(req.params.id, req.body || {});
+    if (!updated) return res.status(404).json({ message: 'Project not found' });
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================================
@@ -319,32 +374,90 @@ app.put('/api/am/kpi-flags', (req, res) => {
 // AM: PROJECT SUBMISSIONS
 // ============================================================================
 
-app.get('/api/am/project-submissions', (req, res) => {
-  res.json(amProjectSubmissions);
+app.get('/api/am/project-submissions', async (req, res, next) => {
+  try {
+    res.json(await listSubmissions());
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.get('/api/am/project-submissions/:id', (req, res) => {
-  const submission = amProjectSubmissions.find((s) => s.id === req.params.id);
-  if (!submission) return res.status(404).json({ message: 'Submission not found' });
-  res.json(submission);
+app.get('/api/am/project-submissions/:id', async (req, res, next) => {
+  try {
+    const submission = await findSubmissionById(req.params.id);
+    if (!submission) return res.status(404).json({ message: 'Submission not found' });
+    res.json(submission);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.post('/api/am/project-submissions', (req, res) => {
-  const newSubmission = {
-    id: createId('submission'),
-    ...req.body,
-    status: req.body.status || 'Pending Review',
-    createdAt: new Date().toISOString(),
-  };
-  amProjectSubmissions.push(newSubmission);
-  res.status(201).json(newSubmission);
+app.post('/api/am/project-submissions', async (req, res, next) => {
+  try {
+    const { client, clientId, submittedById, submittedBy, project, description, objective, priority, deadline, attachmentName, comment, deliverables } = req.body || {};
+    if (!project || !objective || !description) {
+      return res.status(400).json({ message: 'project, objective, and description are required' });
+    }
+    let resolvedClientId = clientId;
+    if (!resolvedClientId && client) {
+      const clientRow = await findClientByName(client);
+      if (!clientRow) return res.status(400).json({ message: `Client "${client}" not found` });
+      resolvedClientId = clientRow.id;
+    }
+    let resolvedSubmittedById = submittedById;
+    if (!resolvedSubmittedById && submittedBy) {
+      const user = await findUserByEmail(submittedBy) || (await listUsers()).find((u) => u.name === submittedBy);
+      resolvedSubmittedById = user?.id;
+    }
+    if (!resolvedClientId || !resolvedSubmittedById) {
+      return res.status(400).json({ message: 'A valid client and submitting user are required' });
+    }
+    const newSubmission = await createSubmission({
+      clientId: resolvedClientId,
+      submittedById: resolvedSubmittedById,
+      projectName: project,
+      description,
+      objective,
+      priority,
+      deadline,
+      attachmentName,
+      comment,
+      deliverables,
+    });
+    res.status(201).json(newSubmission);
+  } catch (error) {
+    next(error);
+  }
 });
 
-app.put('/api/am/project-submissions/:id', (req, res) => {
-  const index = amProjectSubmissions.findIndex((s) => s.id === req.params.id);
-  if (index === -1) return res.status(404).json({ message: 'Submission not found' });
-  amProjectSubmissions[index] = { ...amProjectSubmissions[index], ...req.body };
-  res.json(amProjectSubmissions[index]);
+app.put('/api/am/project-submissions/:id', async (req, res, next) => {
+  try {
+    const { status, reviewedById, reviewedBy, reviewNote } = req.body || {};
+    if (!status) return res.status(400).json({ message: 'status is required' });
+    let resolvedReviewedById = reviewedById;
+    if (!resolvedReviewedById && reviewedBy) {
+      const user = (await listUsers()).find((u) => u.name === reviewedBy);
+      resolvedReviewedById = user?.id;
+    }
+    if (status === 'Approved') {
+      let result;
+      try {
+        result = await approveSubmission(req.params.id, { reviewedById: resolvedReviewedById, reviewNote });
+      } catch (error) {
+        if (error.message.startsWith('Submission is already')) {
+          return res.status(409).json({ message: error.message });
+        }
+        throw error;
+      }
+      if (!result) return res.status(404).json({ message: 'Submission not found' });
+      return res.json(result.submission);
+    }
+    const updated = await updateSubmissionStatus(req.params.id, { status, reviewedById: resolvedReviewedById, reviewNote });
+    if (!updated) return res.status(404).json({ message: 'Submission not found' });
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================================

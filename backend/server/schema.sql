@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS project_submissions (
   deadline DATE,
   attachment_name TEXT,
   message TEXT,
+  deliverables JSONB NOT NULL DEFAULT '[]'::jsonb,
   status TEXT NOT NULL DEFAULT 'Pending Review' CHECK (status IN ('Pending Review', 'Approved', 'Rejected')),
   reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMPTZ,
@@ -56,6 +57,8 @@ CREATE TABLE IF NOT EXISTS project_submissions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE project_submissions ADD COLUMN IF NOT EXISTS deliverables JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS deliverables (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { colors, fontBody, fontDisplay } from "../lib/theme";
-import { apiGet, apiPost, getSession, getStoredAMProjectSubmissions, saveStoredAMProjectSubmissions } from "../lib/teamData";
+import { apiGet, apiPost, getSession } from "../lib/teamData";
 import { CLIENTS, PRODUCTION_ROLES, TEAM_MEMBERS } from "../lib/mockData";
 
 const emptyDeliverable = () => ({
@@ -17,6 +17,7 @@ const emptyDeliverable = () => ({
 
 export default function AMNewProjectPage({ onSubmitted = () => {} }) {
   const session = getSession();
+  const [clientOptions, setClientOptions] = useState(CLIENTS);
   const [client, setClient] = useState("");
   const [project, setProject] = useState("");
   const [objective, setObjective] = useState("");
@@ -27,6 +28,16 @@ export default function AMNewProjectPage({ onSubmitted = () => {} }) {
   const [attachmentName, setAttachmentName] = useState("");
   const [deliverables, setDeliverables] = useState([emptyDeliverable()]);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    apiGet("/om/clients")
+      .then((rows) => {
+        if (rows && rows.length) setClientOptions(rows);
+      })
+      .catch(() => {
+        // keep static CLIENTS fallback if the API is unavailable
+      });
+  }, []);
 
   const updateDeliverable = (id, field, value) => {
     setDeliverables((current) => current.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
@@ -68,14 +79,13 @@ export default function AMNewProjectPage({ onSubmitted = () => {} }) {
         nextAction: "Begin deliverable",
       })),
       submittedBy: session?.name || "Account Manager",
+      submittedById: session?.id,
       submittedAt: new Date().toISOString(),
       status: "Pending Review",
     };
 
     try {
-      await apiPost("/am/project-submissions", submission);
-      const next = [submission, ...(await getStoredAMProjectSubmissions())];
-      saveStoredAMProjectSubmissions(next);
+      const created = await apiPost("/am/project-submissions", submission);
       setMessage("Project submitted for Operations Manager review.");
       setClient("");
       setProject("");
@@ -86,7 +96,7 @@ export default function AMNewProjectPage({ onSubmitted = () => {} }) {
       setComment("");
       setAttachmentName("");
       setDeliverables([emptyDeliverable()]);
-      onSubmitted(submission);
+      onSubmitted(created);
     } catch (error) {
       console.error(error);
       setMessage("The project could not be submitted. Please try again.");
@@ -113,7 +123,7 @@ export default function AMNewProjectPage({ onSubmitted = () => {} }) {
                 style={{ border: `1px solid ${colors.border}` }}
               >
                 <option value="">Select an existing client</option>
-                {CLIENTS.map((item) => (
+                {clientOptions.map((item) => (
                   <option key={item.id} value={item.name}>{item.name}</option>
                 ))}
               </select>
