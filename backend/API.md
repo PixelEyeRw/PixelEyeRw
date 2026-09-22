@@ -1,5 +1,7 @@
 # PixelEye Backend API
 
+> Development reference: this API currently uses in-memory data and does not enforce authentication or authorization. Changes are lost when the Node process restarts. See [README.md](README.md) for the implementation status and production build plan.
+
 Base URL: `http://localhost:4000/api`
 
 ## Health & Info
@@ -27,7 +29,7 @@ Returns the server health status.
 ```
 GET /api/accounts
 ```
-Returns list of all user accounts.
+Returns the development list of user accounts. This endpoint is not protected and must not be exposed in production.
 
 ### Login
 ```
@@ -43,7 +45,7 @@ Authenticates a user.
 }
 ```
 
-**Response:**
+**Current development response:**
 ```json
 {
   "id": "account_am_1",
@@ -53,6 +55,8 @@ Authenticates a user.
   "password": "pass"
 }
 ```
+
+The current implementation includes the plaintext password because it is a development scaffold. The production contract must omit password fields and return an authenticated session or token.
 
 ### Sign Up
 ```
@@ -487,5 +491,7 @@ curl -X POST http://localhost:4000/api/om/tasks \
 
 - All data is stored in memory (no database). Changes are lost on server restart.
 - For production, implement a real database (PostgreSQL, MongoDB, etc.)
-- Authentication is basic (no JWT tokens yet)
-- Add role-based access control (RBAC) for security
+- Authentication is a development-only email/password comparison with no session or token.
+- Passwords are currently plaintext and must be hashed before production use.
+- Add authentication middleware and role-based access control (RBAC) for security.
+- The frontend currently uses only a subset of these endpoints; see [README.md](README.md).

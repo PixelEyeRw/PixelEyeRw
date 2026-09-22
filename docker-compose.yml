@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pixeleye-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pixeleye
+      POSTGRES_USER: pixeleye
+      POSTGRES_PASSWORD: pixeleye_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pixeleye_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  pixeleye_postgres_data:

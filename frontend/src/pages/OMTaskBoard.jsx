@@ -36,21 +36,17 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   const [selectedRole, setSelectedRole] = useState(PRODUCTION_ROLES[0]?.name || "");
   const [selectedAssignee, setSelectedAssignee] = useState("");
   const [manualAssignee, setManualAssignee] = useState("");
+  const [isPersonalTask, setIsPersonalTask] = useState(false);
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [completionComment, setCompletionComment] = useState("");
   const [completionLink, setCompletionLink] = useState("");
+  const [dailyTasks, setDailyTasks] = useState(() => getStoredDailyTasks());
 
   // Get current user session
   const session = getSession();
   const isOM = session?.role === "Operations Manager";
   const currentUser = session?.name;
   const currentUserId = session?.email || currentUser;
-
-  // Get daily tasks from localStorage
-  const dailyTasks = useMemo(() => {
-    if (typeof window === "undefined") return [];
-    return getStoredDailyTasks();
-  }, []);
 
   // Filter daily tasks for current user
   const myDailyTasks = useMemo(() => {
@@ -103,8 +99,12 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       alert("Please select a project for this task.");
       return;
     }
-    const assignee = selectedAssignee === "custom" ? manualAssignee.trim() : selectedAssignee;
-    if (!selectedRole || !assignee) {
+    const assignee = isPersonalTask
+      ? currentUser
+      : selectedAssignee === "custom"
+        ? manualAssignee.trim()
+        : selectedAssignee;
+    if (!isPersonalTask && (!selectedRole || !assignee)) {
       alert("Please select a role and assigned person, or enter the person's name.");
       return;
     }
@@ -119,8 +119,9 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       task: newTaskText.trim(),
       projectId: selectedProjectId,
       projectName: selectedProject ? selectedProject.title : "",
-      role: selectedRole,
+      role: isPersonalTask ? "Personal" : selectedRole,
       assignedTo: assignee,
+      assignmentType: isPersonalTask ? "personal" : "assigned",
       status: "in-progress",
       comment: "",
       createdAt: new Date().toISOString(),
@@ -128,12 +129,14 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     };
 
     const allTasks = getStoredDailyTasks();
-    saveStoredDailyTasks([...allTasks, newTask]);
+    const updatedTasks = [...allTasks, newTask];
+    saveStoredDailyTasks(updatedTasks);
+    setDailyTasks(updatedTasks);
     setNewTaskText("");
     setSelectedProjectId("");
     setSelectedAssignee("");
     setManualAssignee("");
-    window.location.reload(); // Refresh to show new task
+    setIsPersonalTask(false);
   };
 
   const handleStartCompleting = (taskId) => {
@@ -169,10 +172,10 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     });
 
     saveStoredDailyTasks(updatedTasks);
+    setDailyTasks(updatedTasks);
     setCompletingTaskId(null);
     setCompletionComment("");
     setCompletionLink("");
-    window.location.reload(); // Refresh to show updated tasks
   };
 
   const handleDeleteTask = (taskId) => {
@@ -181,7 +184,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     const allTasks = getStoredDailyTasks();
     const updatedTasks = allTasks.filter((task) => task.id !== taskId);
     saveStoredDailyTasks(updatedTasks);
-    window.location.reload(); // Refresh to show updated list
+    setDailyTasks(updatedTasks);
   };
 
   const updateRow = (rowId, field, value) => {
@@ -230,15 +233,27 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
         <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
           <h3 className="text-sm font-semibold mb-3" style={{ ...fontBody, color: colors.primary }}>Add New Task</h3>
           <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm" style={{ ...fontBody, color: colors.primary }}>
+              <input
+                type="checkbox"
+                checked={isPersonalTask}
+                onChange={(event) => {
+                  setIsPersonalTask(event.target.checked);
+                  setSelectedAssignee("");
+                  setManualAssignee("");
+                }}
+              />
+              This is a personal task
+            </label>
             <div>
-              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>Assign Role *</label>
-              <select value={selectedRole} onChange={(event) => { setSelectedRole(event.target.value); setSelectedAssignee(""); }} className="w-full rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}`, ...fontBody }}>
+              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>Assign Role {isPersonalTask ? "(optional)" : "*"}</label>
+              <select disabled={isPersonalTask} value={selectedRole} onChange={(event) => { setSelectedRole(event.target.value); setSelectedAssignee(""); }} className="w-full rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}`, ...fontBody }}>
                 {PRODUCTION_ROLES.map((role) => <option key={role.id} value={role.name}>{role.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>Assigned Person *</label>
-              <select value={selectedAssignee} onChange={(event) => setSelectedAssignee(event.target.value)} className="w-full rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}`, ...fontBody }}>
+              <label className="text-xs font-semibold block mb-1" style={{ ...fontBody, color: colors.primary }}>Assigned Person {isPersonalTask ? "(optional)" : "*"}</label>
+              <select disabled={isPersonalTask} value={selectedAssignee} onChange={(event) => setSelectedAssignee(event.target.value)} className="w-full rounded px-3 py-2 text-sm" style={{ border: `1px solid ${colors.border}`, ...fontBody }}>
                 <option value="">-- Select person --</option>
                 {TEAM_MEMBERS.filter((member) => member.role.toLowerCase() === selectedRole.toLowerCase()).map((member) => <option key={member.id} value={member.name}>{member.name}</option>)}
                 <option value="custom">Type a name manually</option>

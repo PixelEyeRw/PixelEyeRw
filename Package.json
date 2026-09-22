@@ -9,12 +9,15 @@
     "preview": "cd frontend && vite preview",
     "start": "node backend/server/index.js",
     "server": "node backend/server/index.js",
-    "dev:full": "concurrently \"npm run server\" \"npm run dev\""
+    "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
+    "db:migrate": "node backend/server/migrate.js",
+    "db:check": "node backend/server/check-db.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "lucide-react": "^0.383.0",
+    "pg": "^8.23.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.12.0"
