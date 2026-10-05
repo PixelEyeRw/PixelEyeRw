@@ -25,6 +25,19 @@ export async function listSystemRoles() {
   return result.rows;
 }
 
+export async function updateUserRole(id, role) {
+  const result = await pool.query(
+    `UPDATE users SET role = $1, updated_at = NOW()
+     WHERE id = $2
+     RETURNING id, name, email, role, title`,
+    [role, id]
+  );
+  if (result.rows[0]) {
+    await pool.query('UPDATE auth_sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL', [id]);
+  }
+  return result.rows[0] || null;
+}
+
 export async function listAccountManagers() {
   const result = await pool.query(`
     SELECT u.id, u.name, u.title, u.email,

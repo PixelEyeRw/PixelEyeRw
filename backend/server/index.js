@@ -17,7 +17,7 @@ import {
   intakes,
   createId,
 } from './data.js';
-import { createUser, findUserByEmail, findUserById, listUsers, listAccountManagers, listSystemRoles, getUserProfile, updateUserProfile, toPublicUser } from './repositories/users.js';
+import { createUser, findUserByEmail, findUserById, listUsers, listAccountManagers, listSystemRoles, updateUserRole, getUserProfile, updateUserProfile, toPublicUser } from './repositories/users.js';
 import { listClients, findClientById, findClientByName, createClient } from './repositories/clients.js';
 import { listProjects, listAMProjects, findProjectById, createProject, updateProject, updateAMProjects } from './repositories/projects.js';
 import { listSubmissions, findSubmissionById, createSubmission, updateSubmissionStatus, approveSubmission } from './repositories/submissions.js';
@@ -102,6 +102,20 @@ app.get('/api/accounts', async (req, res, next) => {
     if (!isOperationsRole(req.user.role)) return res.status(403).json({ message: 'Operations role required' });
     const users = await listUsers();
     res.json(users.map(toPublicUser));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/accounts/:id/role', async (req, res, next) => {
+  try {
+    if (req.user.role !== 'Director') return res.status(403).json({ message: 'Director role required' });
+    const validRoles = ['Operations Manager', 'Account Manager', 'Production', 'Director'];
+    if (!validRoles.includes(req.body?.role)) return res.status(400).json({ message: 'A valid system role is required' });
+    const updated = await updateUserRole(req.params.id, req.body.role);
+    if (!updated) return res.status(404).json({ message: 'User not found' });
+    if (req.params.id === req.user.id) res.clearCookie('pixeleye_session', sessionCookieOptions);
+    res.json(updated);
   } catch (error) {
     next(error);
   }
@@ -347,6 +361,12 @@ app.post('/api/om/projects', async (req, res, next) => {
 
 app.put('/api/om/projects/:id', async (req, res, next) => {
   try {
+    if (req.body?.accountManagerId) {
+      const newOwner = await findUserById(req.body.accountManagerId);
+      if (!newOwner || newOwner.role !== 'Account Manager') {
+        return res.status(400).json({ message: 'Project owner must be an Account Manager' });
+      }
+    }
     const updated = await updateProject(req.params.id, req.body || {});
     if (!updated) return res.status(404).json({ message: 'Project not found' });
     res.json(updated);
@@ -456,7 +476,7 @@ app.post('/api/daily-tasks', async (req, res, next) => {
 
 app.put('/api/daily-tasks/:id', async (req, res, next) => {
   try {
-    const task = await updateDailyTask(req.params.id, req.user.id, req.body || {});
+    const task = await updateDailyTask(req.params.id, req.user.id, req.body || {}, isOperationsRole(req.user.role));
     if (!task) return res.status(404).json({ message: 'Daily task not found' });
     res.json(task);
   } catch (error) {
@@ -466,7 +486,7 @@ app.put('/api/daily-tasks/:id', async (req, res, next) => {
 
 app.delete('/api/daily-tasks/:id', async (req, res, next) => {
   try {
-    const deleted = await deleteDailyTask(req.params.id, req.user.id);
+    const deleted = await deleteDailyTask(req.params.id, req.user.id, isOperationsRole(req.user.role));
     if (!deleted) return res.status(404).json({ message: 'Daily task not found' });
     res.status(204).end();
   } catch (error) {

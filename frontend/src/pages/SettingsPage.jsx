@@ -20,11 +20,13 @@ export default function SettingsPage() {
   const [inviteRole, setInviteRole] = useState("Account Manager");
   const [inviteMessage, setInviteMessage] = useState("");
   const [invites, setInvites] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [avatarPreview, setAvatarPreview] = useState("");
   const [profileError, setProfileError] = useState("");
   const session = getSession();
   const roleText = session?.role?.toLowerCase() || "";
   const isOmOrDirector = roleText.includes("operation") || roleText.includes("operations") || roleText.includes("director") || roleText.includes("ops");
+  const isDirector = session?.role === "Director";
 
   useEffect(() => {
     apiGet("/profile")
@@ -34,6 +36,7 @@ export default function SettingsPage() {
       .then(setInvites)
       .catch((error) => console.error("Could not load invitations:", error));
     if (isOmOrDirector) apiGet("/om/roles").then(setRoles).catch((error) => console.error("Could not load roles:", error));
+    if (isDirector) apiGet("/accounts").then(setTeamMembers).catch((error) => console.error("Could not load team members:", error));
   }, []);
 
   const profileAvatar = useMemo(() => profile.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80", [profile.avatar]);
@@ -72,6 +75,16 @@ export default function SettingsPage() {
       setInviteRole("Account Manager");
     } catch (error) {
       setInviteMessage(error.message || "Could not create invite.");
+    }
+  };
+
+  const handleRoleChange = async (user, role) => {
+    try {
+      const updated = await apiPut(`/accounts/${user.id}/role`, { role });
+      setTeamMembers((current) => current.map((member) => member.id === updated.id ? updated : member));
+      if (updated.id === session?.id) window.dispatchEvent(new Event("pixeleye:unauthorized"));
+    } catch (error) {
+      setInviteMessage(error.message || "Could not update the employee role.");
     }
   };
 
@@ -191,6 +204,35 @@ export default function SettingsPage() {
             ))}
           </tbody>
         </table>
+        {isDirector && (
+          <div className="mt-8">
+            <h4 style={{ ...fontBody, color: colors.primary }} className="font-semibold mb-3">Employee access</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                  <tr style={{ color: colors.muted, ...fontBody }} className="text-xs uppercase">
+                    <th className="pb-2">Employee</th>
+                    <th className="pb-2">Email</th>
+                    <th className="pb-2">System role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {teamMembers.map((member) => (
+                    <tr key={member.id} style={{ borderTop: `1px solid ${colors.border}` }}>
+                      <td className="py-3 font-semibold" style={{ color: colors.primary, ...fontBody }}>{member.name}</td>
+                      <td className="py-3" style={{ color: colors.muted, ...fontBody }}>{member.email}</td>
+                      <td className="py-3">
+                        <select value={member.role} onChange={(event) => handleRoleChange(member, event.target.value)} className="rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}`, ...fontBody }}>
+                          {Object.keys(ROLE_ACCESS).map((role) => <option key={role} value={role}>{role}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
       )}
     </div>

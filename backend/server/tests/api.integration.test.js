@@ -13,6 +13,7 @@ let baseUrl;
 let accountManager;
 let otherManager;
 let operations;
+let director;
 let ownedProjectId;
 let foreignProjectId;
 let ownedClientId;
@@ -54,6 +55,7 @@ before(async () => {
   accountManager = await createUser('Integration AM', 'Account Manager');
   otherManager = await createUser('Other AM', 'Account Manager');
   operations = await createUser('Integration OM', 'Operations Manager');
+  director = await createUser('Integration Director', 'Director');
 
   const ownedClient = await pool.query(
     'INSERT INTO clients (name, account_manager_id) VALUES ($1, $2) RETURNING id',
@@ -91,7 +93,7 @@ after(async () => {
     if (ownedClientId || foreignClientId) {
       await pool.query('DELETE FROM clients WHERE id = ANY($1::uuid[])', [[ownedClientId, foreignClientId].filter(Boolean)]);
     }
-    const userIds = [accountManager?.id, otherManager?.id, operations?.id].filter(Boolean);
+    const userIds = [accountManager?.id, otherManager?.id, operations?.id, director?.id].filter(Boolean);
     if (userIds.length) await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [userIds]);
     await pool.end();
   }
@@ -104,8 +106,10 @@ test('JWT sessions enforce identity, role access, and intake persistence', async
 
   const amSession = await login(accountManager.email);
   const omSession = await login(operations.email);
+  const directorSession = await login(director.email);
   assert.equal(amSession.response.status, 200);
   assert.equal(omSession.response.status, 200);
+  assert.equal(directorSession.response.status, 200);
   assert.ok(amSession.cookie);
   assert.match(amSession.response.headers.get('set-cookie'), /HttpOnly/i);
   assert.equal('token' in amSession.body, false);
@@ -145,6 +149,23 @@ test('JWT sessions enforce identity, role access, and intake persistence', async
   assert.equal(dailyTaskResponse.status, 201);
   assert.equal(dailyTask.employeeId, accountManager.id);
 
+  const directorTasksResponse = await fetch(`${baseUrl}/api/daily-tasks`, { headers: cookieHeaders(directorSession.cookie) });
+  const directorTasks = await directorTasksResponse.json();
+  assert.equal(directorTasksResponse.status, 200);
+  assert.ok(directorTasks.some((task) => task.id === dailyTaskId));
+  const directorTaskUpdate = await fetch(`${baseUrl}/api/daily-tasks/${dailyTaskId}`, {
+    method: 'PUT',
+    headers: cookieHeaders(directorSession.cookie),
+    body: JSON.stringify({ employeeId: otherManager.id, status: 'done', comment: 'Director review' }),
+  });
+  assert.equal(directorTaskUpdate.status, 200);
+
+  const directorProjectsResponse = await fetch(`${baseUrl}/api/om/projects`, { headers: cookieHeaders(directorSession.cookie) });
+  const directorProjects = await directorProjectsResponse.json();
+  assert.equal(directorProjectsResponse.status, 200);
+  assert.ok(directorProjects.some((project) => project.id === ownedProjectId));
+  assert.ok(directorProjects.some((project) => project.id === foreignProjectId));
+
   const intakeResponse = await fetch(`${baseUrl}/api/om/intakes`, {
     method: 'POST',
     headers: cookieHeaders(omSession.cookie),
@@ -157,6 +178,33 @@ test('JWT sessions enforce identity, role access, and intake persistence', async
   const roleResponse = await fetch(`${baseUrl}/api/om/roles`, { headers: cookieHeaders(omSession.cookie) });
   assert.equal(roleResponse.status, 200);
   assert.ok((await roleResponse.json()).some((role) => role.name === 'Account Manager'));
+
+  const deniedRoleChange = await fetch(`${baseUrl}/api/accounts/${operations.id}/role`, {
+    method: 'PUT',
+    headers: cookieHeaders(omSession.cookie),
+    body: JSON.stringify({ role: 'Account Manager' }),
+  });
+  assert.equal(deniedRoleChange.status, 403);
+
+  const reassignment = await fetch(`${baseUrl}/api/om/projects/${ownedProjectId}`, {
+    method: 'PUT',
+    headers: cookieHeaders(directorSession.cookie),
+    body: JSON.stringify({ accountManagerId: otherManager.id }),
+  });
+  assert.equal(reassignment.status, 200);
+  const hiddenAfterReassignment = await fetch(`${baseUrl}/api/om/projects/${ownedProjectId}`, {
+    headers: cookieHeaders(amSession.cookie),
+  });
+  assert.equal(hiddenAfterReassignment.status, 404);
+
+  const roleChange = await fetch(`${baseUrl}/api/accounts/${operations.id}/role`, {
+    method: 'PUT',
+    headers: cookieHeaders(directorSession.cookie),
+    body: JSON.stringify({ role: 'Account Manager' }),
+  });
+  assert.equal(roleChange.status, 200);
+  const revokedOperationsSession = await fetch(`${baseUrl}/api/auth/session`, { headers: cookieHeaders(omSession.cookie) });
+  assert.equal(revokedOperationsSession.status, 401);
 
   const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, {
     method: 'POST',

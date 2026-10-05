@@ -6,7 +6,6 @@ import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import OMTaskBoard from "../../pages/OMTaskBoard";
 import ReportsPage from "../../pages/ReportsPage";
 import SettingsPage from "../../pages/SettingsPage";
-import { INITIAL_OM_TASK_BOARD } from "../../lib/mockData";
 import { getStoredOMTaskBoard, saveStoredOMTaskBoard } from "../../lib/teamData";
 
 const PRODUCTION_NAV_ITEMS = [
@@ -23,12 +22,7 @@ export default function ProductionApp({ onSignOut }) {
   useEffect(() => {
     const loadTaskBoard = async () => {
       const storedTaskBoard = await getStoredOMTaskBoard();
-      if (storedTaskBoard.length > 0) {
-        setTaskBoardRows(storedTaskBoard);
-      } else {
-        setTaskBoardRows(INITIAL_OM_TASK_BOARD);
-        saveStoredOMTaskBoard(INITIAL_OM_TASK_BOARD);
-      }
+      setTaskBoardRows(storedTaskBoard);
     };
 
     loadTaskBoard();

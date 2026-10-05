@@ -65,7 +65,7 @@ export async function updateAMTaskProgress(rows = [], accountManagerId) {
 export async function listTaskBoard({ userId, isOperations = false } = {}) {
   const result = await pool.query(`
     SELECT t.id, COALESCE(p.display_code, 'AM-' || LEFT(p.id::text, 8)) AS "projectId",
-      c.name AS client, p.title AS project, t.stage AS "taskStage", t.task AS "mainTask",
+      c.name AS client, p.title AS project, t.stage AS "taskStage", t.task AS "mainTask", t.role,
       COALESCE(u.name, t.manual_assignee, 'Unassigned') AS owner, t.support, t.priority,
       t.status, t.progress, t.deadline, t.approval_status AS "approvalStatus"
     FROM tasks t
@@ -88,11 +88,11 @@ export async function updateTaskBoard(rows = []) {
       const assignedTo = assignee.rows[0]?.id || null;
       const manualAssignee = assignedTo ? null : row.owner || null;
       await client.query(
-        `UPDATE tasks SET task = $1, stage = $2, assigned_to = $3, manual_assignee = $4,
-          support = $5, priority = $6, status = $7, progress = $8, deadline = $9,
-          approval_status = $10, updated_at = NOW()
-         WHERE id = $11 AND task_type = 'project'`,
-        [row.mainTask, row.taskStage || null, assignedTo, manualAssignee, row.support || null, row.priority || null, row.status, row.progress, row.deadline || null, row.approvalStatus || 'Not Required', row.id]
+        `UPDATE tasks SET task = $1, stage = $2, role = $3, assigned_to = $4, manual_assignee = $5,
+          support = $6, priority = $7, status = $8, progress = $9, deadline = $10,
+          approval_status = $11, updated_at = NOW()
+         WHERE id = $12 AND task_type = 'project'`,
+        [row.mainTask, row.taskStage || null, row.role || null, assignedTo, manualAssignee, row.support || null, row.priority || null, row.status, row.progress, row.deadline || null, row.approvalStatus || 'Not Required', row.id]
       );
     }
     await client.query('COMMIT');
@@ -133,23 +133,25 @@ export async function createDailyTask(input) {
   return tasks.find((task) => task.id === result.rows[0].id);
 }
 
-export async function updateDailyTask(id, userId, fields) {
+export async function updateDailyTask(id, userId, fields, isOperations = false) {
   const result = await pool.query(
     `UPDATE tasks SET status = COALESCE($1, status), comment = COALESCE($2, comment),
       submission_link = COALESCE($3, submission_link), completed_at = CASE WHEN $1 = 'done' THEN NOW() ELSE completed_at END,
       updated_at = NOW()
-    WHERE id = $4 AND task_type = 'daily' AND (created_by = $5 OR assigned_to = $5) RETURNING id`,
-    [fields.status ?? null, fields.comment ?? null, fields.submissionLink ?? null, id, userId]
+     WHERE id = $4 AND task_type = 'daily'
+       AND ($6::boolean = TRUE OR created_by = $5 OR assigned_to = $5) RETURNING id`,
+    [fields.status ?? null, fields.comment ?? null, fields.submissionLink ?? null, id, userId, isOperations]
   );
   if (!result.rows[0]) return null;
-  const tasks = await listDailyTasks(userId, false);
+  const tasks = await listDailyTasks(userId, isOperations);
   return tasks.find((task) => task.id === id) || null;
 }
 
-export async function deleteDailyTask(id, userId) {
+export async function deleteDailyTask(id, userId, isOperations = false) {
   const result = await pool.query(
-    `DELETE FROM tasks WHERE id = $1 AND task_type = 'daily' AND created_by = $2 RETURNING id`,
-    [id, userId]
+    `DELETE FROM tasks WHERE id = $1 AND task_type = 'daily'
+       AND ($3::boolean = TRUE OR created_by = $2) RETURNING id`,
+    [id, userId, isOperations]
   );
   return Boolean(result.rows[0]);
 }

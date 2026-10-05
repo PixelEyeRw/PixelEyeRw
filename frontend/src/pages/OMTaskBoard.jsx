@@ -28,7 +28,7 @@ function rowTone(status) {
   return { bg: "#EEF4FF", text: colors.primary };
 }
 
-export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
+export default function OMTaskBoard({ rows = [], onRowsChange = () => {}, viewMode = "auto" }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [newTaskText, setNewTaskText] = useState("");
@@ -42,28 +42,36 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   const [completionLink, setCompletionLink] = useState("");
   const [dailyTasks, setDailyTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
 
   // Get current user session
   const session = getSession();
-  const isOM = session?.role === "Operations Manager";
+  const isOperationsManager = session?.role === "Operations Manager";
+  const isDirector = session?.role === "Director";
+  const isTeamView = viewMode === "team" || (viewMode !== "personal" && isOperationsManager);
+  const canManageDailyTasks = !isTeamView || isDirector;
+  const canManageProjectTasks = isOperationsManager || isDirector;
   const currentUser = session?.name;
   const currentUserId = session?.id;
 
   useEffect(() => {
-    const query = new URLSearchParams({ userId: currentUserId || "", isOperations: String(isOM) });
-    Promise.all([apiGet(`/daily-tasks?${query}`), apiGet("/om/projects")])
-      .then(([tasks, projectRows]) => {
+    const query = new URLSearchParams({ userId: currentUserId || "", isOperations: String(isTeamView || isDirector) });
+    const requests = [apiGet(`/daily-tasks?${query}`), apiGet("/om/projects")];
+    if (canManageProjectTasks) requests.push(apiGet("/accounts"));
+    Promise.all(requests)
+      .then(([tasks, projectRows, members = []]) => {
         setDailyTasks(tasks);
         setProjects(projectRows);
+        setTeamMembers(members);
       })
       .catch((error) => alert(error.message || "Could not load tasks from the server."));
-  }, [currentUserId, isOM]);
+  }, [currentUserId, isTeamView, isDirector, canManageProjectTasks]);
 
   // Filter daily tasks for current user
   const myDailyTasks = useMemo(() => {
-    if (isOM) return dailyTasks; // OM sees all
+    if (isTeamView) return dailyTasks;
     return dailyTasks.filter((task) => task.employeeName === currentUser || task.employeeId === currentUserId);
-  }, [dailyTasks, currentUser, currentUserId, isOM]);
+  }, [dailyTasks, currentUser, currentUserId, isTeamView]);
 
   // Separate active and completed tasks
   const activeTasks = useMemo(() => {
@@ -78,9 +86,9 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
 
   // Filter by owner for non-OM users (for project tasks)
   const ownerFilteredRows = useMemo(() => {
-    if (isOM || !currentUser) return rows;
+    if (isTeamView || !currentUser) return rows;
     return rows.filter((row) => row.owner === currentUser);
-  }, [rows, isOM, currentUser]);
+  }, [rows, isTeamView, currentUser]);
 
   const filteredRows = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -201,10 +209,10 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     <div className="p-4 sm:p-6 space-y-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold" style={{ ...fontDisplay, color: colors.primary }}>
-          {isOM ? "Team Daily Tasks" : "My Daily Tasks"}
+          {isTeamView ? "Team Daily Tasks" : "My Daily Tasks"}
         </h1>
         <p className="mt-2 text-sm" style={{ ...fontBody, color: colors.muted }}>
-          {isOM 
+          {isTeamView
             ? "View and monitor all team member daily tasks and their progress."
             : "Add your daily tasks, track your progress, and mark them complete with updates."}
         </p>
@@ -226,7 +234,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       </div>
 
       {/* Add New Task Section */}
-      {!isOM && (
+      {!isTeamView && (
         <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
           <h3 className="text-sm font-semibold mb-3" style={{ ...fontBody, color: colors.primary }}>Add New Task</h3>
           <div className="space-y-3">
@@ -313,12 +321,12 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       {/* Active Tasks List */}
       <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
         <h3 className="text-lg font-semibold mb-4" style={{ ...fontBody, color: colors.primary }}>
-          {isOM ? "Active Team Tasks" : "My Active Tasks"} ({activeTasks.length})
+          {isTeamView ? "Active Team Tasks" : "My Active Tasks"} ({activeTasks.length})
         </h3>
         <div className="space-y-3">
           {activeTasks.length === 0 ? (
             <p className="text-sm text-center py-8" style={{ ...fontBody, color: colors.muted }}>
-              {isOM ? "No active tasks from team members" : "No active tasks. Add your first task above!"}
+              {isTeamView ? "No active tasks from team members" : "No active tasks. Add your first task above!"}
             </p>
           ) : (
             activeTasks.map((task) => (
@@ -343,12 +351,12 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
                         </span>
                       </div>
                     )}
-                    {isOM && (
+                    {isTeamView && (
                       <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
                         <strong>{task.employeeName}</strong> • {new Date(task.createdAt).toLocaleString()}
                       </div>
                     )}
-                    {!isOM && (
+                    {canManageDailyTasks && (
                       <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
                         Added: {new Date(task.createdAt).toLocaleString()}
                       </div>
@@ -400,7 +408,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
                       </div>
                     ) : (
                       <div className="flex gap-2 mt-2">
-                        {!isOM && (
+                        {canManageDailyTasks && (
                           <>
                             <button
                               onClick={() => handleStartCompleting(task.id)}
@@ -457,7 +465,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
                         </span>
                       </div>
                     )}
-                    {isOM && (
+                    {isTeamView && (
                       <div className="text-xs mb-2" style={{ ...fontBody, color: colors.muted }}>
                         <strong>{task.employeeName}</strong>
                       </div>
@@ -495,6 +503,42 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
           </div>
         </div>
       )}
+
+      <section className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold" style={{ ...fontBody, color: colors.primary }}>{isTeamView ? "Project Tasks — Company-wide" : "Project Tasks"}</h3>
+            <p className="mt-1 text-sm" style={{ ...fontBody, color: colors.muted }}>{canManageProjectTasks ? "Review and manage assignments and delivery status." : "Project tasks assigned to you."}</p>
+          </div>
+          <span className="text-sm" style={{ ...fontBody, color: colors.muted }}>{filteredRows.length} tasks</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px] text-left text-sm" style={fontBody}>
+            <thead>
+              <tr className="text-xs uppercase" style={{ color: colors.muted }}>
+                <th className="p-2">Project</th><th className="p-2">Task</th><th className="p-2">Role</th>
+                <th className="p-2">Owner</th><th className="p-2">Status</th><th className="p-2">Progress</th><th className="p-2">Deadline</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((row) => (
+                <tr key={row.id} style={{ borderTop: `1px solid ${colors.border}` }}>
+                  <td className="p-2"><div className="font-semibold" style={{ color: colors.primary }}>{row.project}</div><div className="text-xs" style={{ color: colors.muted }}>{row.client} · {row.projectId}</div></td>
+                  <td className="p-2">{row.mainTask}</td>
+                  <td className="p-2">{canManageProjectTasks ? <input aria-label="Task role" value={row.role || ""} onChange={(event) => updateRow(row.id, "role", event.target.value)} className="w-32 rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}` }} /> : row.role || "-"}</td>
+                  <td className="p-2">{canManageProjectTasks ? <input aria-label="Task owner" value={row.owner || ""} list={`team-members-${row.id}`} onChange={(event) => updateRow(row.id, "owner", event.target.value)} className="w-40 rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}` }} /> : row.owner || "Unassigned"}
+                    {canManageProjectTasks && <datalist id={`team-members-${row.id}`}>{teamMembers.map((member) => <option key={member.id} value={member.name} />)}</datalist>}
+                  </td>
+                  <td className="p-2">{canManageProjectTasks ? <select value={row.status} onChange={(event) => updateRow(row.id, "status", event.target.value)} className="rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}` }}>{STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}</select> : row.status}</td>
+                  <td className="p-2">{canManageProjectTasks ? <input aria-label="Task progress" type="number" min="0" max="100" value={row.progress} onChange={(event) => updateRow(row.id, "progress", event.target.value)} className="w-20 rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}` }} /> : `${row.progress}%`}</td>
+                  <td className="p-2">{canManageProjectTasks ? <input aria-label="Task deadline" type="date" value={row.deadline?.slice(0, 10) || ""} onChange={(event) => updateRow(row.id, "deadline", event.target.value)} className="rounded px-2 py-1 text-xs" style={{ border: `1px solid ${colors.border}` }} /> : row.deadline || "-"}</td>
+                </tr>
+              ))}
+              {filteredRows.length === 0 && <tr><td colSpan={7} className="p-4 text-sm" style={{ color: colors.muted }}>No project tasks found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }

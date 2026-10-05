@@ -86,8 +86,9 @@ export async function updateProject(id, fields, accountManagerId) {
   await pool.query(
     `UPDATE projects
      SET title = $1, priority = $2, status = $3, progress = $4, start_date = $5, target_deadline = $6,
-       risk_level = $7, task_stage = $8, revenue_source = $9, cost_source = $10, updated_at = NOW()
-    WHERE id = $11 AND ($12::uuid IS NULL OR account_manager_id = $12)`,
+       risk_level = $7, task_stage = $8, revenue_source = $9, cost_source = $10,
+       account_manager_id = $11, updated_at = NOW()
+     WHERE id = $12 AND ($13::uuid IS NULL OR account_manager_id = $13)`,
     [
       fields.title ?? current.title,
       fields.priority ?? current.priority,
@@ -99,6 +100,7 @@ export async function updateProject(id, fields, accountManagerId) {
       fields.taskStage ?? current.task_stage,
       fields.revenueSource ?? current.revenue_source,
       fields.costSource ?? current.cost_source,
+      fields.accountManagerId ?? current.account_manager_id,
       id,
       accountManagerId || null,
     ]

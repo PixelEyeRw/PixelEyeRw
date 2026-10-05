@@ -18,7 +18,6 @@ import OMTaskBoard from "../../pages/OMTaskBoard";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import {
   INITIAL_AM_KPI_FLAGS,
-  INITIAL_OM_TASK_BOARD,
 } from "../../lib/mockData";
 import {
   getSession,
@@ -84,12 +83,7 @@ export default function AMApp({ onSignOut }) {
       if (!selected) saveStoredAMSelectedProject(defaultProject);
 
       const storedTaskBoard = await getStoredOMTaskBoard();
-      if (storedTaskBoard.length > 0) {
-        setTaskBoardRows(storedTaskBoard);
-      } else {
-        setTaskBoardRows(INITIAL_OM_TASK_BOARD);
-        saveStoredOMTaskBoard(INITIAL_OM_TASK_BOARD);
-      }
+      setTaskBoardRows(storedTaskBoard);
     };
 
     loadData();

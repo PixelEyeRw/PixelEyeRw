@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Gauge, Settings as SettingsIcon, PlusCircle, ClipboardList, Package } from "lucide-react";
+import { LayoutDashboard, Users, Briefcase, CalendarDays, BarChart3, Gauge, Settings as SettingsIcon, PlusCircle, ClipboardList, Package, ListTodo, CircleDollarSign } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
 import ReassignModal from "./components/ReassignModal";
@@ -13,9 +13,11 @@ import ReportsPage from "../../pages/ReportsPage";
 import WorkloadPage from "../../pages/WorkloadPage";
 import SettingsPage from "../../pages/SettingsPage";
 import DeliverablesPage from "../../pages/DeliverablesPage";
+import DirectorDashboardPage from "../../pages/DirectorDashboardPage";
+import AMProjectList from "../../pages/AMProjectList";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
-import { INITIAL_AMS, INITIAL_DELETED, INITIAL_OM_TASK_BOARD } from "../../lib/mockData";
-import { getStoredOMTaskBoard, saveStoredOMTaskBoard } from "../../lib/teamData";
+import { INITIAL_DELETED } from "../../lib/mockData";
+import { apiGet, apiPut, getStoredAMProjectList, getStoredOMTaskBoard, saveStoredAMProjectList, saveStoredOMTaskBoard } from "../../lib/teamData";
 
 function hasLegacySheetValues(rows) {
   return rows.some((row) => String(row.projectId || "").startsWith("P-"));
@@ -36,21 +38,25 @@ const OM_NAV_ITEMS = [
 
 export default function OMApp({ onSignOut, isDirector = false }) {
   const [page, setPage] = useState("dashboard");
-  const [ams, setAms] = useState(INITIAL_AMS);
+  const [ams, setAms] = useState([]);
   const [deleted, setDeleted] = useState(INITIAL_DELETED);
   const [taskRows, setTaskRows] = useState([]);
+  const [financialRows, setFinancialRows] = useState([]);
   const [reassignTarget, setReassignTarget] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const navItems = isDirector
+    ? [...OM_NAV_ITEMS, { key: "financials", label: "Financials", icon: CircleDollarSign }, { key: "my-todos", label: "My To-Dos", icon: ListTodo }]
+    : OM_NAV_ITEMS;
 
   useEffect(() => {
+    apiGet("/om/account-managers")
+      .then(setAms)
+      .catch((error) => console.error("Could not load account managers:", error));
+    if (isDirector) getStoredAMProjectList().then(setFinancialRows).catch((error) => console.error("Could not load financial project data:", error));
+
     const loadRows = async () => {
       const storedRows = await getStoredOMTaskBoard();
-      if (storedRows.length > 0 && !hasLegacySheetValues(storedRows)) {
-        setTaskRows(storedRows);
-        return;
-      }
-      setTaskRows(INITIAL_OM_TASK_BOARD);
-      saveStoredOMTaskBoard(INITIAL_OM_TASK_BOARD);
+      setTaskRows(storedRows.filter((row) => !hasLegacySheetValues([row])));
     };
 
     loadRows();
@@ -61,25 +67,29 @@ export default function OMApp({ onSignOut, isDirector = false }) {
     saveStoredOMTaskBoard(nextRows);
   };
 
+  const handleFinancialRowsChange = (nextRows) => {
+    setFinancialRows(nextRows);
+    saveStoredAMProjectList(nextRows);
+  };
+
   const handleIntake = () => setPage("intake");
   const handleRestore = (id) => setDeleted((prev) => prev.map((d) => (d.id === id ? { ...d, restored: true } : d)));
-  const handleReassignConfirm = (targetId) => {
-    setAms((prev) => {
-      const fromId = reassignTarget.id;
-      const moved = 3;
-      return prev.map((a) => {
-        if (a.id === fromId) return { ...a, activeProjects: Math.max(0, a.activeProjects - moved) };
-        if (a.id === targetId) return { ...a, activeProjects: a.activeProjects + moved };
-        return a;
-      });
-    });
-    setReassignTarget(null);
+  const handleReassignConfirm = async ({ projectId, accountManagerId }) => {
+    try {
+      await apiPut(`/om/projects/${projectId}`, { accountManagerId });
+      const [nextManagers, nextTasks] = await Promise.all([apiGet("/om/account-managers"), apiGet("/om/tasks")]);
+      setAms(nextManagers);
+      setTaskRows(nextTasks);
+      setReassignTarget(null);
+    } catch (error) {
+      window.alert(error.message || "Could not reassign the project.");
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row" style={{ ...fontBody, background: "#FAF9F6" }}>
       <style>{GOOGLE_FONTS_IMPORT}</style>
-      <Sidebar active={page} onNavigate={setPage} navItems={OM_NAV_ITEMS} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar active={page} onNavigate={setPage} navItems={navItems} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
         <Topbar onSidebarToggle={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
         <div className="px-4 py-2 flex items-center justify-between">
@@ -92,15 +102,13 @@ export default function OMApp({ onSignOut, isDirector = false }) {
             <button onClick={onSignOut} className="rounded px-3 py-2 text-sm font-semibold" style={{ border: `1px solid ${colors.border}` }}>Sign out</button>
           </div>
         </div>
-        {page === "dashboard" && (
-          isDirector ? (
-            <DashboardPage ams={ams} deleted={deleted} taskRows={taskRows} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
-          ) : (
-            <DashboardPage ams={ams} deleted={deleted} taskRows={taskRows} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />
-          )
-        )}
+        {page === "dashboard" && (isDirector
+          ? <DirectorDashboardPage onNavigate={setPage} />
+          : <DashboardPage ams={ams} deleted={deleted} taskRows={taskRows} onNewIntake={handleIntake} onRestore={handleRestore} onReassign={setReassignTarget} />)}
         {page === "intake" && <IntakePage />}
-        {page === "task-board" && <OMTaskBoard rows={taskRows} onRowsChange={handleTaskRowsChange} />}
+        {page === "task-board" && <OMTaskBoard rows={taskRows} onRowsChange={handleTaskRowsChange} viewMode={isDirector ? "team" : "auto"} />}
+        {page === "financials" && isDirector && <AMProjectList rows={financialRows} onRowsChange={handleFinancialRowsChange} />}
+        {page === "my-todos" && isDirector && <OMTaskBoard rows={taskRows} onRowsChange={handleTaskRowsChange} viewMode="personal" />}
         {page === "deliverables" && <DeliverablesPage />}
         {page === "clients" && <ClientsPage onNavigate={setPage} />}
         {page === "projects" && <ProjectsPage />}
