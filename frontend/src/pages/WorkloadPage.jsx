@@ -1,14 +1,26 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowLeftRight, Video, Palette, PenTool, Film, AlertTriangle } from "lucide-react";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
 import { capacityStatus, clientWorkloadStatus } from "../lib/status";
 import { PRODUCTION_ROLES } from "../lib/mockData";
+import { apiGet } from "../lib/teamData";
 
 const ICONS = { Video, Palette, PenTool, Film };
 
 // GET /api/om/workload — filterable by AM or by production role
-export default function WorkloadPage({ ams, onReassign }) {
+export default function WorkloadPage({ onReassign }) {
   const [view, setView] = useState("am");
+  const [ams, setAms] = useState([]);
+  const [roleTaskCounts, setRoleTaskCounts] = useState([]);
+
+  useEffect(() => {
+    apiGet("/om/workload")
+      .then((data) => {
+        setAms(data.accountManagers || []);
+        setRoleTaskCounts(data.productionRoles || []);
+      })
+      .catch((error) => console.error("Could not load workload:", error));
+  }, []);
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -96,7 +108,8 @@ export default function WorkloadPage({ ams, onReassign }) {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {PRODUCTION_ROLES.map((r) => {
+          {PRODUCTION_ROLES.map((role) => {
+            const r = { ...role, activeTasks: roleTaskCounts.find((item) => item.role === role.name)?.activeTasks || 0 };
             const pct = r.activeTasks / r.capacityMax;
             const status = capacityStatus(pct);
             const Icon = ICONS[r.icon];

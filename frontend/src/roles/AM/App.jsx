@@ -17,9 +17,6 @@ import AMIncoming from "../../pages/AMIncoming";
 import OMTaskBoard from "../../pages/OMTaskBoard";
 import { fontBody, GOOGLE_FONTS_IMPORT, colors } from "../../lib/theme";
 import {
-  INITIAL_AM_PROJECT_LIST,
-  INITIAL_AM_TASK_PROGRESS,
-  INITIAL_AM_CLIENT_UPDATES,
   INITIAL_AM_KPI_FLAGS,
   INITIAL_OM_TASK_BOARD,
 } from "../../lib/mockData";
@@ -37,21 +34,8 @@ import {
   saveStoredAMSelectedProject,
   getStoredOMTaskBoard,
   saveStoredOMTaskBoard,
-  getStoredAMProjectSubmissions,
 } from "../../lib/teamData";
 import { kpiSummary } from "../../lib/amWorkbook";
-
-function hasLegacyProjectValues(rows) {
-  return rows.some((row) => String(row.projectId || "").startsWith("P-"));
-}
-
-function hasLegacyTaskValues(rows) {
-  return rows.some((row) => String(row.projectId || "").startsWith("P-") || row.status === "Waiting Approval");
-}
-
-function hasLegacyClientValues(rows) {
-  return rows.some((row) => Number(row.satisfactionScore) === 9 && row.notes === "Example only");
-}
 
 const AM_NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -72,83 +56,30 @@ export default function AMApp({ onSignOut }) {
   const [kpiFlags, setKpiFlags] = useState(INITIAL_AM_KPI_FLAGS);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [taskBoardRows, setTaskBoardRows] = useState([]);
-
-  const approvedSubmissionData = (submissions, owner) => {
-    const approved = submissions.filter((submission) => submission.status === "Approved" && submission.submittedBy === owner);
-    return {
-      projects: approved.map((submission) => ({
-        id: submission.id,
-        projectId: submission.projectId,
-        client: submission.client,
-        project: submission.project,
-        accountOwner: submission.submittedBy,
-        projectLead: submission.deliverables[0]?.assignee || submission.submittedBy,
-        startDate: submission.submittedAt.slice(0, 10),
-        targetDeadline: submission.deadline || submission.deliverables.reduce((latest, item) => item.deadline > latest ? item.deadline : latest, ""),
-        priority: submission.priority,
-        riskLevel: "Low",
-        overallStatus: "In Progress",
-        taskStage: submission.deliverables[0]?.stage || "Deliverables",
-        revenueSource: 0,
-        costSource: 0,
-      })),
-      tasks: approved.flatMap((submission) => submission.deliverables.map((item) => ({
-        id: item.id,
-        projectId: submission.projectId,
-        client: submission.client,
-        project: submission.project,
-        stage: item.stage,
-        deliverableName: item.name,
-        mainTask: item.mainTask || item.name,
-        role: item.role,
-        owner: item.assignee || item.customAssignee || "Unassigned",
-        status: item.status || "Not Started",
-        progress: item.progress || 0,
-        deadline: item.deadline,
-        approvalStatus: item.approvalStatus || "Not Required",
-        nextAction: item.nextAction || "Begin deliverable",
-        deliverableId: item.id,
-      }))),
-    };
-  };
+  const currentUserId = getSession()?.id;
 
   useEffect(() => {
     const loadData = async () => {
       const session = getSession();
-      const owner = session?.name || "Elena Rossi";
-      const submissionData = approvedSubmissionData(await getStoredAMProjectSubmissions(), owner);
+      const accountManagerId = session?.id;
+      const storedProjects = await getStoredAMProjectList(accountManagerId);
+      setProjectRows(storedProjects);
 
-      const storedProjects = await getStoredAMProjectList();
-      const useStoredProjects = storedProjects.length > 0 && !hasLegacyProjectValues(storedProjects);
-      const effectiveProjects = storedProjects.length
-        ? (useStoredProjects ? storedProjects : INITIAL_AM_PROJECT_LIST.filter((row) => row.accountOwner === owner))
-        : INITIAL_AM_PROJECT_LIST.filter((row) => row.accountOwner === owner);
-      const mergedProjects = [...effectiveProjects, ...submissionData.projects.filter((row) => !effectiveProjects.some((existing) => existing.projectId === row.projectId))];
-      setProjectRows(mergedProjects);
-      if (!useStoredProjects || submissionData.projects.length) saveStoredAMProjectList(mergedProjects);
+      const storedTasks = await getStoredAMTaskProgress(accountManagerId);
+      setTaskRows(storedTasks);
 
-      const storedTasks = await getStoredAMTaskProgress();
-      const useStoredTasks = storedTasks.length > 0 && !hasLegacyTaskValues(storedTasks);
-      const effectiveTasks = useStoredTasks ? storedTasks : INITIAL_AM_TASK_PROGRESS;
-      const mergedTasks = [...effectiveTasks, ...submissionData.tasks.filter((row) => !effectiveTasks.some((existing) => existing.id === row.id))];
-      setTaskRows(mergedTasks);
-      if (!useStoredTasks || submissionData.tasks.length) saveStoredAMTaskProgress(mergedTasks);
+      const storedUpdates = await getStoredAMClientUpdates(accountManagerId);
+      setClientUpdates(storedUpdates);
 
-      const storedUpdates = await getStoredAMClientUpdates();
-      const useStoredUpdates = storedUpdates.length > 0 && !hasLegacyClientValues(storedUpdates);
-      const effectiveUpdates = useStoredUpdates ? storedUpdates : INITIAL_AM_CLIENT_UPDATES;
-      setClientUpdates(effectiveUpdates);
-      if (!useStoredUpdates) saveStoredAMClientUpdates(effectiveUpdates);
-
-      const storedFlags = await getStoredAMKpiFlags();
+      const storedFlags = await getStoredAMKpiFlags(accountManagerId);
       if (storedFlags) {
         setKpiFlags(storedFlags);
       } else {
-        saveStoredAMKpiFlags(INITIAL_AM_KPI_FLAGS);
+        saveStoredAMKpiFlags(INITIAL_AM_KPI_FLAGS, accountManagerId);
       }
 
       const selected = getStoredAMSelectedProject();
-      const defaultProject = effectiveProjects[0]?.projectId || "";
+      const defaultProject = storedProjects[0]?.projectId || "";
       setSelectedProjectId(selected || defaultProject);
       if (!selected) saveStoredAMSelectedProject(defaultProject);
 
@@ -193,12 +124,12 @@ export default function AMApp({ onSignOut }) {
 
   const handleClientUpdatesChange = (nextRows) => {
     setClientUpdates(nextRows);
-    saveStoredAMClientUpdates(nextRows);
+    saveStoredAMClientUpdates(nextRows, currentUserId);
   };
 
   const handleKpiFlagsChange = (nextFlags) => {
     setKpiFlags(nextFlags);
-    saveStoredAMKpiFlags(nextFlags);
+    saveStoredAMKpiFlags(nextFlags, currentUserId);
   };
 
   const handleSelectProject = (projectId) => {

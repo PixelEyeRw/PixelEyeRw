@@ -186,23 +186,14 @@ async function fetchJsonWithLocalFallback(path, localKey, fallbackValue) {
   }
 }
 
-async function persistJsonWithApi(path, payload, localKey, method = "PUT") {
-  if (typeof window === "undefined") return;
-
+async function persistJsonWithApi(path, payload, method = "PUT") {
   try {
-    await fetch(`/api${path}`, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    // localStorage fallback below
-  }
-
-  try {
-    window.localStorage.setItem(localKey, JSON.stringify(payload));
-  } catch {
-    // ignore storage failures
+    return await apiRequest(path, { method, body: JSON.stringify(payload) });
+  } catch (error) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("pixeleye:api-save-error", { detail: error.message }));
+    }
+    return null;
   }
 }
 
@@ -211,39 +202,45 @@ export async function getStoredOMTaskBoard() {
 }
 
 export function saveStoredOMTaskBoard(rows) {
-  void persistJsonWithApi("/om/tasks", rows, OM_TASK_BOARD_KEY, "PUT");
+  return persistJsonWithApi("/om/tasks", rows, "PUT");
 }
 
-export async function getStoredAMProjectList() {
-  return fetchJsonWithLocalFallback("/am/project-list", AM_PROJECT_LIST_KEY, []);
+export async function getStoredAMProjectList(accountManagerId) {
+  const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : "";
+  return fetchJsonWithLocalFallback(`/am/project-list${query}`, AM_PROJECT_LIST_KEY, []);
 }
 
 export function saveStoredAMProjectList(rows) {
-  void persistJsonWithApi("/am/project-list", rows, AM_PROJECT_LIST_KEY, "PUT");
+  return persistJsonWithApi("/am/project-list", rows, "PUT");
 }
 
-export async function getStoredAMTaskProgress() {
-  return fetchJsonWithLocalFallback("/am/task-progress", AM_TASK_PROGRESS_KEY, []);
+export async function getStoredAMTaskProgress(accountManagerId) {
+  const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : "";
+  return fetchJsonWithLocalFallback(`/am/task-progress${query}`, AM_TASK_PROGRESS_KEY, []);
 }
 
 export function saveStoredAMTaskProgress(rows) {
-  void persistJsonWithApi("/am/task-progress", rows, AM_TASK_PROGRESS_KEY, "PUT");
+  return persistJsonWithApi("/am/task-progress", rows, "PUT");
 }
 
-export async function getStoredAMClientUpdates() {
-  return fetchJsonWithLocalFallback("/am/client-updates", AM_CLIENT_UPDATES_KEY, []);
+export async function getStoredAMClientUpdates(accountManagerId) {
+  const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : "";
+  return fetchJsonWithLocalFallback(`/am/client-updates${query}`, AM_CLIENT_UPDATES_KEY, []);
 }
 
-export function saveStoredAMClientUpdates(rows) {
-  void persistJsonWithApi("/am/client-updates", rows, AM_CLIENT_UPDATES_KEY, "PUT");
+export function saveStoredAMClientUpdates(rows, accountManagerId) {
+  const query = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : "";
+  return persistJsonWithApi(`/am/client-updates${query}`, rows, "PUT");
 }
 
-export async function getStoredAMKpiFlags() {
-  return fetchJsonWithLocalFallback("/am/kpi-flags", AM_KPI_FLAGS_KEY, null);
+export async function getStoredAMKpiFlags(userId) {
+  const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  return fetchJsonWithLocalFallback(`/am/kpi-flags${query}`, AM_KPI_FLAGS_KEY, null);
 }
 
-export function saveStoredAMKpiFlags(flags) {
-  void persistJsonWithApi("/am/kpi-flags", flags, AM_KPI_FLAGS_KEY, "PUT");
+export function saveStoredAMKpiFlags(flags, userId) {
+  const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+  return persistJsonWithApi(`/am/kpi-flags${query}`, flags, "PUT");
 }
 
 export function getStoredAMSelectedProject() {
@@ -302,12 +299,14 @@ export function saveStoredAMProjectSubmissions(submissions) {
 }
 
 export async function apiRequest(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
   const response = await fetch(`/api${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
     ...options,
+    headers,
+    credentials: "same-origin",
   });
 
   if (!response.ok) {
@@ -318,6 +317,10 @@ export async function apiRequest(path, options = {}) {
       message = parsed.message || text;
     } catch {
       // response wasn't JSON; use raw text
+    }
+    if (response.status === 401 && typeof window !== "undefined") {
+      clearSession();
+      window.dispatchEvent(new Event("pixeleye:unauthorized"));
     }
     throw new Error(message || `Request failed for ${path}`);
   }

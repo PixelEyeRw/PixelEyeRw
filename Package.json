@@ -13,13 +13,15 @@
     "db:migrate": "node backend/server/migrate.js",
     "db:check": "node backend/server/check-db.js",
     "db:seed-users": "node backend/server/seed-users.js",
-    "db:seed-domain": "node backend/server/seed-domain.js"
+    "db:seed-domain": "node backend/server/seed-domain.js",
+    "test:api": "npm run db:migrate && node --test backend/server/tests/api.integration.test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^18.0.2",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.383.0",
     "pg": "^8.23.0",
     "react": "^18.2.0",

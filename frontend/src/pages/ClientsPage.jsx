@@ -1,9 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
 import { healthBadge } from "../lib/status";
-import { CLIENTS } from "../lib/mockData";
-import { getSession } from "../lib/teamData";
+import { apiGet, getSession } from "../lib/teamData";
 
 function ClientDrawer({ client, onClose, onViewProjects }) {
   const badge = healthBadge(client.health);
@@ -49,16 +48,25 @@ export default function ClientsPage({ onNavigate }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [selected, setSelected] = useState(null);
+  const [clients, setClients] = useState([]);
+
+  useEffect(() => {
+    const accountManagerId = session?.role?.toLowerCase().includes("account") ? session.id : "";
+    const queryString = accountManagerId ? `?accountManagerId=${encodeURIComponent(accountManagerId)}` : "";
+    apiGet(`/om/clients${queryString}`)
+      .then(setClients)
+      .catch((error) => console.error("Could not load clients:", error));
+  }, [session?.id, session?.role]);
 
   const filtered = useMemo(
     () =>
-      CLIENTS.filter((c) => {
+      clients.filter((c) => {
         const isVisibleToAM = session?.role?.toLowerCase().includes("account") ? c.am === session.name : true;
         const matchesQuery = c.name.toLowerCase().includes(query.toLowerCase());
         const matchesFilter = filter === "all" || c.health === filter;
         return isVisibleToAM && matchesQuery && matchesFilter;
       }),
-    [query, filter, session]
+    [clients, query, filter, session]
   );
 
   return (
@@ -119,7 +127,7 @@ export default function ClientsPage({ onNavigate }) {
                       {badge.label}
                     </span>
                   </td>
-                  <td className="p-4" style={{ color: colors.muted }}>{c.lastActivity}</td>
+                  <td className="p-4" style={{ color: colors.muted }}>{c.lastActivity || "No activity yet"}</td>
                 </tr>
               );
             })}

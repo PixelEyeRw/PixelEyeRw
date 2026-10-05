@@ -1,96 +1,49 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, X, Upload, Mail, Link2 } from "lucide-react";
+import { Upload, Mail, Link2 } from "lucide-react";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
-import { CAPABILITIES, INITIAL_ROLES } from "../lib/mockData";
-import { buildInviteLink, createInviteToken, defaultProfile, getStoredInvites, getStoredProfile, saveStoredInvites, saveStoredProfile, getSession } from "../lib/teamData";
+import { apiGet, apiPost, apiPut, buildInviteLink, defaultProfile, getSession } from "../lib/teamData";
 
-function RoleEditor({ role, onClose, onSave }) {
-  const [name, setName] = useState(role?.name || "");
-  const [perms, setPerms] = useState(role?.permissions || { view_tasks: true });
-  const toggle = (key) => setPerms((p) => ({ ...p, [key]: !p[key] }));
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div className="rounded-lg p-6 w-[28rem]" style={{ background: colors.neutral }}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-xl">
-            {role ? "Edit Role" : "Create Role"}
-          </h3>
-          <button onClick={onClose}><X size={18} color={colors.muted} /></button>
-        </div>
-        <label style={{ ...fontBody, color: colors.muted }} className="text-xs uppercase block mb-1">Role name</label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Social Media Manager"
-          className="w-full rounded p-2 mb-4 text-sm"
-          style={{ ...fontBody, border: `1px solid ${colors.border}` }}
-        />
-        <div style={{ ...fontBody, color: colors.muted }} className="text-xs uppercase mb-2">Permissions</div>
-        <div className="space-y-2 mb-2 max-h-64 overflow-y-auto">
-          {CAPABILITIES.map((c) => (
-            <label key={c.key} className="flex items-center gap-2 text-sm" style={{ ...fontBody, color: colors.primary, opacity: c.locked ? 0.6 : 1 }}>
-              <input type="checkbox" checked={!!perms[c.key]} disabled={c.locked} onChange={() => toggle(c.key)} />
-              {c.label}
-              {c.locked && <span style={{ color: colors.muted }} className="text-xs">(always on)</span>}
-            </label>
-          ))}
-        </div>
-        <p style={{ color: colors.muted, ...fontBody }} className="text-xs mb-4">
-          Need more than these toggles? Custom fields & screens are configured after saving, from the role's detail view.
-        </p>
-        <button
-          disabled={!name}
-          onClick={() => onSave({ name, permissions: perms })}
-          className="w-full rounded py-2.5 text-sm font-semibold disabled:opacity-40"
-          style={{ ...fontBody, background: colors.primary, color: colors.neutral }}
-        >
-          Save Role
-        </button>
-      </div>
-    </div>
-  );
-}
+const ROLE_ACCESS = {
+  "Operations Manager": "Manage studio operations, clients, intakes, and workload.",
+  "Account Manager": "Manage assigned clients, projects, submissions, and updates.",
+  Production: "Work on assigned projects and tasks.",
+  Director: "View and manage studio-wide operations.",
+};
 
 // GET  /api/om/roles
 // POST /api/om/roles
 // PATCH /api/om/roles/:id
 export default function SettingsPage() {
-  const [roles, setRoles] = useState(INITIAL_ROLES);
-  const [editing, setEditing] = useState(null);
-  const [creating, setCreating] = useState(false);
+  const [roles, setRoles] = useState([]);
   const [profile, setProfile] = useState(defaultProfile);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("Account Manager");
   const [inviteMessage, setInviteMessage] = useState("");
   const [invites, setInvites] = useState([]);
   const [avatarPreview, setAvatarPreview] = useState("");
-
-  useEffect(() => {
-    setProfile(getStoredProfile());
-    setInvites(getStoredInvites());
-  }, []);
-
+  const [profileError, setProfileError] = useState("");
   const session = getSession();
   const roleText = session?.role?.toLowerCase() || "";
   const isOmOrDirector = roleText.includes("operation") || roleText.includes("operations") || roleText.includes("director") || roleText.includes("ops");
 
+  useEffect(() => {
+    apiGet("/profile")
+      .then(setProfile)
+      .catch((error) => setProfileError(error.message || "Could not load profile."));
+    apiGet("/invites")
+      .then(setInvites)
+      .catch((error) => console.error("Could not load invitations:", error));
+    if (isOmOrDirector) apiGet("/om/roles").then(setRoles).catch((error) => console.error("Could not load roles:", error));
+  }, []);
+
   const profileAvatar = useMemo(() => profile.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80", [profile.avatar]);
 
-  const saveEdit = (data) => {
-    setRoles((prev) => prev.map((r) => (r.id === editing.id ? { ...r, ...data } : r)));
-    setEditing(null);
-  };
-  const saveNew = (data) => {
-    setRoles((prev) => [...prev, { id: `role${prev.length + 1}`, users: 0, active: true, ...data }]);
-    setCreating(false);
-  };
-  const toggleActive = (id) => setRoles((prev) => prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)));
 
   const handleProfileChange = (field, value) => {
     const updatedProfile = { ...profile, [field]: value };
     setProfile(updatedProfile);
-    saveStoredProfile(updatedProfile);
+    apiPut("/profile", updatedProfile)
+      .catch((error) => setProfileError(error.message || "Could not save profile."));
   };
 
   const handleAvatarUpload = (event) => {
@@ -102,28 +55,24 @@ export default function SettingsPage() {
       const updatedProfile = { ...profile, avatar: imageData };
       setProfile(updatedProfile);
       setAvatarPreview(imageData);
-      saveStoredProfile(updatedProfile);
+      apiPut("/profile", updatedProfile)
+        .catch((error) => setProfileError(error.message || "Could not save profile photo."));
     };
     reader.readAsDataURL(file);
   };
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
-    const token = createInviteToken();
-    const newInvite = {
-      id: token,
-      email: inviteEmail.trim(),
-      role: inviteRole,
-      createdAt: new Date().toISOString(),
-      status: "Pending",
-      link: buildInviteLink(token),
-    };
-    const nextInvites = [newInvite, ...invites];
-    setInvites(nextInvites);
-    saveStoredInvites(nextInvites);
-    setInviteMessage(`Invite sent to ${inviteEmail.trim()} with a secure signup link.`);
-    setInviteEmail("");
-    setInviteRole("Account Manager");
+    try {
+      const created = await apiPost("/invites", { email: inviteEmail.trim(), role: inviteRole, createdBy: session?.id });
+      const newInvite = { ...created, link: buildInviteLink(created.token) };
+      setInvites((current) => [newInvite, ...current]);
+      setInviteMessage(`Invite created for ${inviteEmail.trim()}. Share the signup link before it expires.`);
+      setInviteEmail("");
+      setInviteRole("Account Manager");
+    } catch (error) {
+      setInviteMessage(error.message || "Could not create invite.");
+    }
   };
 
   return (
@@ -156,7 +105,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="text-xs uppercase block mb-1" style={{ ...fontBody, color: colors.muted }}>Role</label>
-            <input value={profile.role} onChange={(e) => handleProfileChange("role", e.target.value)} className="w-full rounded p-2 text-sm" style={{ ...fontBody, border: `1px solid ${colors.border}` }} />
+            <input value={profile.role} readOnly className="w-full rounded p-2 text-sm" style={{ ...fontBody, border: `1px solid ${colors.border}` }} />
           </div>
           <div>
             <label className="text-xs uppercase block mb-1" style={{ ...fontBody, color: colors.muted }}>Title</label>
@@ -171,6 +120,7 @@ export default function SettingsPage() {
             <textarea value={profile.bio} onChange={(e) => handleProfileChange("bio", e.target.value)} rows={3} className="w-full rounded p-2 text-sm" style={{ ...fontBody, border: `1px solid ${colors.border}` }} />
           </div>
         </div>
+        {profileError && <p className="mt-3 text-sm" role="alert" style={{ ...fontBody, color: colors.danger }}>{profileError}</p>}
       </div>
 
 {isOmOrDirector && (
@@ -191,9 +141,8 @@ export default function SettingsPage() {
             <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="w-full rounded p-2 text-sm" style={{ ...fontBody, border: `1px solid ${colors.border}` }}>
               <option>Director</option>
               <option>Account Manager</option>
-              <option>Content Lead</option>
-              <option>Designer</option>
-              <option>Video Editor</option>
+              <option>Operations Manager</option>
+              <option>Production</option>
             </select>
           </div>
           <button onClick={handleInvite} className="flex items-center justify-center gap-2 rounded px-3 py-2 text-sm font-semibold" style={{ background: colors.primary, color: colors.neutral, ...fontBody }}>
@@ -209,12 +158,12 @@ export default function SettingsPage() {
                 <div className="font-semibold" style={{ color: colors.primary }}>{invite.email}</div>
                 <div style={{ color: colors.muted }}>{invite.role} · {invite.status}</div>
               </div>
-              <div className="flex items-center gap-2">
+              {invite.link && <div className="flex items-center gap-2">
                 <span className="rounded px-2 py-1 text-xs" style={{ background: colors.onTrack, color: colors.neutral }}>{invite.link}</span>
                 <button onClick={() => navigator.clipboard?.writeText(invite.link)} className="flex items-center gap-1 rounded px-2 py-1 text-xs font-semibold" style={{ background: colors.secondary, color: colors.neutral }}>
                   <Link2 size={12} /> Copy
                 </button>
-              </div>
+              </div>}
             </div>
           ))}
         </div>
@@ -223,19 +172,13 @@ export default function SettingsPage() {
 
 {isOmOrDirector && (
       <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg">Roles & Permissions</h3>
-          <button onClick={() => setCreating(true)} className="flex items-center gap-2 rounded px-3 py-1.5 text-xs font-semibold" style={{ background: colors.primary, color: colors.neutral, ...fontBody }}>
-            <Plus size={12} /> Create Role
-          </button>
-        </div>
+        <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">System Roles</h3>
         <table className="w-full text-left text-sm">
           <thead>
             <tr style={{ color: colors.muted, ...fontBody }} className="text-xs uppercase">
               <th className="pb-2">Role</th>
               <th className="pb-2">Users</th>
-              <th className="pb-2">Status</th>
-              <th className="pb-2">Action</th>
+              <th className="pb-2">Access</th>
             </tr>
           </thead>
           <tbody>
@@ -243,33 +186,13 @@ export default function SettingsPage() {
               <tr key={r.id} style={{ borderTop: `1px solid ${colors.border}` }}>
                 <td className="py-3 font-semibold" style={{ color: colors.primary, ...fontBody }}>{r.name}</td>
                 <td className="py-3" style={{ color: colors.muted, ...fontBody }}>{r.users}</td>
-                <td className="py-3">
-                  <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: r.active ? colors.onTrack : colors.muted, color: colors.neutral, ...fontBody }}>
-                    {r.active ? "Active" : "Inactive"}
-                  </span>
-                </td>
-                <td className="py-3 flex gap-3">
-                  <button onClick={() => setEditing(r)} className="text-xs font-semibold" style={{ color: colors.secondary, ...fontBody }}>Edit</button>
-                  <button onClick={() => toggleActive(r.id)} className="text-xs font-semibold" style={{ color: colors.muted, ...fontBody }}>
-                    {r.active ? "Deactivate" : "Activate"}
-                  </button>
-                </td>
+                <td className="py-3" style={{ color: colors.muted, ...fontBody }}>{ROLE_ACCESS[r.name]}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       )}
-      <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-        <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">General</h3>
-        <label style={{ ...fontBody, color: colors.muted }} className="text-xs uppercase block mb-1">Studio name</label>
-        <input defaultValue="Marketing Flow" className="w-full rounded p-2 text-sm mb-4" style={{ ...fontBody, border: `1px solid ${colors.border}` }} />
-        <label style={{ ...fontBody, color: colors.muted }} className="text-xs uppercase block mb-1">Notification email</label>
-        <input defaultValue="ops@marketingflow.studio" className="w-full rounded p-2 text-sm" style={{ ...fontBody, border: `1px solid ${colors.border}` }} />
-      </div>
-
-      {editing && <RoleEditor role={editing} onClose={() => setEditing(null)} onSave={saveEdit} />}
-      {creating && <RoleEditor role={null} onClose={() => setCreating(false)} onSave={saveNew} />}
     </div>
   );
 }

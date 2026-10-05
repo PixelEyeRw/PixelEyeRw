@@ -43,13 +43,13 @@ function withDisplayId(row) {
   };
 }
 
-export async function listSubmissions() {
-  const result = await pool.query(`${SELECT} ORDER BY s.created_at DESC`);
+export async function listSubmissions(submittedById) {
+  const result = await pool.query(`${SELECT} WHERE ($1::uuid IS NULL OR s.submitted_by = $1) ORDER BY s.created_at DESC`, [submittedById || null]);
   return result.rows.map(withDisplayId);
 }
 
-export async function findSubmissionById(id) {
-  const result = await pool.query(`${SELECT} WHERE s.id = $1`, [id]);
+export async function findSubmissionById(id, submittedById) {
+  const result = await pool.query(`${SELECT} WHERE s.id = $1 AND ($2::uuid IS NULL OR s.submitted_by = $2)`, [id, submittedById || null]);
   return withDisplayId(result.rows[0] || null);
 }
 
@@ -99,10 +99,10 @@ export async function approveSubmission(id, { reviewedById, reviewNote }) {
     }
 
     const projectResult = await client.query(
-      `INSERT INTO projects (title, client_id, account_manager_id, priority, status, progress, target_deadline)
-       VALUES ($1, $2, $3, $4, 'In Progress', 0, $5)
+      `INSERT INTO projects (display_code, title, client_id, account_manager_id, priority, status, progress, target_deadline, task_stage)
+       VALUES ($1, $2, $3, $4, $5, 'In Progress', 0, $6, $7)
        RETURNING id`,
-      [submission.project_name, submission.client_id, submission.submitted_by, submission.priority, submission.deadline]
+      [`AM-${submission.id.slice(0, 8)}`, submission.project_name, submission.client_id, submission.submitted_by, submission.priority, submission.deadline, submission.deliverables?.[0]?.stage || 'Deliverables']
     );
     const projectId = projectResult.rows[0].id;
 
@@ -133,6 +133,9 @@ export async function approveSubmission(id, { reviewedById, reviewNote }) {
         task: item.mainTask || item.name,
         deadline: item.deadline,
         status: 'Not Started',
+        approvalStatus: item.approvalStatus,
+        nextAction: item.nextAction,
+        stage: item.stage,
       });
     }
 

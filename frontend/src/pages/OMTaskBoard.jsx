@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { colors, fontBody, fontDisplay } from "../lib/theme";
-import { getSession, getStoredDailyTasks, saveStoredDailyTasks } from "../lib/teamData";
+import { apiGet, apiPost, apiPut, apiRequest, getSession } from "../lib/teamData";
 import { CheckCircle, Clock, Plus, X, ExternalLink, MessageSquare, Briefcase } from "lucide-react";
-import { PROJECTS, PRODUCTION_ROLES, TEAM_MEMBERS } from "../lib/mockData";
+import { PRODUCTION_ROLES, TEAM_MEMBERS } from "../lib/mockData";
 
 const STATUS_OPTIONS = ["Not Started", "In Progress", "Client Review", "Completed", "On Hold", "Cancelled"];
 const PRIORITY_OPTIONS = ["High", "Medium", "Low"];
@@ -40,13 +40,24 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
   const [completingTaskId, setCompletingTaskId] = useState(null);
   const [completionComment, setCompletionComment] = useState("");
   const [completionLink, setCompletionLink] = useState("");
-  const [dailyTasks, setDailyTasks] = useState(() => getStoredDailyTasks());
+  const [dailyTasks, setDailyTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
 
   // Get current user session
   const session = getSession();
   const isOM = session?.role === "Operations Manager";
   const currentUser = session?.name;
-  const currentUserId = session?.email || currentUser;
+  const currentUserId = session?.id;
+
+  useEffect(() => {
+    const query = new URLSearchParams({ userId: currentUserId || "", isOperations: String(isOM) });
+    Promise.all([apiGet(`/daily-tasks?${query}`), apiGet("/om/projects")])
+      .then(([tasks, projectRows]) => {
+        setDailyTasks(tasks);
+        setProjects(projectRows);
+      })
+      .catch((error) => alert(error.message || "Could not load tasks from the server."));
+  }, [currentUserId, isOM]);
 
   // Filter daily tasks for current user
   const myDailyTasks = useMemo(() => {
@@ -93,7 +104,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     return { total, completed, inProgress };
   }, [activeTasks, completedTasks]);
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTaskText.trim()) return;
     if (!selectedProjectId) {
       alert("Please select a project for this task.");
@@ -109,34 +120,24 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
       return;
     }
     
-    const selectedProject = PROJECTS.find((p) => p.id === selectedProjectId);
-    
-    const newTask = {
-      id: `dt_${Date.now()}`,
-      employeeId: currentUserId,
-      employeeName: currentUser,
-      date: new Date().toISOString().split("T")[0],
-      task: newTaskText.trim(),
-      projectId: selectedProjectId,
-      projectName: selectedProject ? selectedProject.title : "",
-      role: isPersonalTask ? "Personal" : selectedRole,
-      assignedTo: assignee,
-      assignmentType: isPersonalTask ? "personal" : "assigned",
-      status: "in-progress",
-      comment: "",
-      createdAt: new Date().toISOString(),
-      completedAt: null,
-    };
-
-    const allTasks = getStoredDailyTasks();
-    const updatedTasks = [...allTasks, newTask];
-    saveStoredDailyTasks(updatedTasks);
-    setDailyTasks(updatedTasks);
-    setNewTaskText("");
-    setSelectedProjectId("");
-    setSelectedAssignee("");
-    setManualAssignee("");
-    setIsPersonalTask(false);
+    try {
+      const createdTask = await apiPost("/daily-tasks", {
+        employeeId: currentUserId,
+        task: newTaskText.trim(),
+        projectId: selectedProjectId,
+        role: isPersonalTask ? "Personal" : selectedRole,
+        assignedTo: assignee,
+        assignmentType: isPersonalTask ? "personal" : "assigned",
+      });
+      setDailyTasks((current) => [createdTask, ...current]);
+      setNewTaskText("");
+      setSelectedProjectId("");
+      setSelectedAssignee("");
+      setManualAssignee("");
+      setIsPersonalTask(false);
+    } catch (error) {
+      alert(error.message || "Could not add the task.");
+    }
   };
 
   const handleStartCompleting = (taskId) => {
@@ -151,40 +152,36 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
     setCompletionLink("");
   };
 
-  const handleConfirmComplete = () => {
+  const handleConfirmComplete = async () => {
     if (!completionComment.trim() && !completionLink.trim()) {
       alert("Please provide either a comment or a link before marking as done.");
       return;
     }
 
-    const allTasks = getStoredDailyTasks();
-    const updatedTasks = allTasks.map((task) => {
-      if (task.id === completingTaskId) {
-        return {
-          ...task,
-          status: "done",
-          comment: completionComment.trim() || task.comment,
-          submissionLink: completionLink.trim(),
-          completedAt: new Date().toISOString(),
-        };
-      }
-      return task;
-    });
-
-    saveStoredDailyTasks(updatedTasks);
-    setDailyTasks(updatedTasks);
-    setCompletingTaskId(null);
-    setCompletionComment("");
-    setCompletionLink("");
+    try {
+      const updated = await apiPut(`/daily-tasks/${completingTaskId}`, {
+        employeeId: currentUserId,
+        status: "done",
+        comment: completionComment.trim(),
+        submissionLink: completionLink.trim(),
+      });
+      setDailyTasks((current) => current.map((task) => task.id === updated.id ? updated : task));
+      setCompletingTaskId(null);
+      setCompletionComment("");
+      setCompletionLink("");
+    } catch (error) {
+      alert(error.message || "Could not update the task.");
+    }
   };
 
-  const handleDeleteTask = (taskId) => {
+  const handleDeleteTask = async (taskId) => {
     if (!confirm("Are you sure you want to delete this task?")) return;
-    
-    const allTasks = getStoredDailyTasks();
-    const updatedTasks = allTasks.filter((task) => task.id !== taskId);
-    saveStoredDailyTasks(updatedTasks);
-    setDailyTasks(updatedTasks);
+    try {
+      await apiRequest(`/daily-tasks/${taskId}`, { method: "DELETE", body: JSON.stringify({ employeeId: currentUserId }) });
+      setDailyTasks((current) => current.filter((task) => task.id !== taskId));
+    } catch (error) {
+      alert(error.message || "Could not delete the task.");
+    }
   };
 
   const updateRow = (rowId, field, value) => {
@@ -271,7 +268,7 @@ export default function OMTaskBoard({ rows = [], onRowsChange = () => {} }) {
                 style={{ border: `1px solid ${colors.border}`, ...fontBody }}
               >
                 <option value="">-- Choose a project --</option>
-                {PROJECTS.map((project) => (
+                {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.title} ({project.client})
                   </option>

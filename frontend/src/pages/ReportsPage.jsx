@@ -2,10 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Download, FileText, Upload, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from "recharts";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
-import { REPORT_SHORTCUTS, COMPLETION_TREND, PROJECTS } from "../lib/mockData";
-import { getSession, getStoredReports, getStoredTasks, saveStoredReports } from "../lib/teamData";
+import { apiGet, apiPost, getSession } from "../lib/teamData";
 
-export default function ReportsPage({ ams = [] }) {
+export default function ReportsPage() {
   const session = getSession();
   const [reports, setReports] = useState([]);
   const [message, setMessage] = useState("");
@@ -13,71 +12,68 @@ export default function ReportsPage({ ams = [] }) {
   const [projectId, setProjectId] = useState("");
   const [files, setFiles] = useState([]);
   const [statusMessage, setStatusMessage] = useState("");
-  const [generating, setGenerating] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [summary, setSummary] = useState({ totalTasks: 0, completed: 0, avgProjectProgress: 0 });
 
   useEffect(() => {
-    setReports(getStoredReports());
-  }, []);
+    const isOperations = !session?.role?.toLowerCase().includes("account");
+    const query = new URLSearchParams({ userId: session?.id || "", isOperations: String(isOperations) });
+    Promise.all([
+      apiGet(`/reports?${query}`),
+      apiGet("/om/projects"),
+      apiGet(`/reports/summary?${query}`),
+    ])
+      .then(([reportRows, projectRows, reportSummary]) => {
+        setReports(reportRows);
+        setProjects(projectRows);
+        setSummary(reportSummary);
+      })
+      .catch((error) => console.error("Could not load reports:", error));
+  }, [session?.id, session?.role]);
 
-  const assignedProjects = useMemo(() => {
-    if (!session?.role?.toLowerCase().includes("account")) return PROJECTS;
-    return PROJECTS.filter((project) => project.am === session.name);
-  }, [session]);
+  const assignedProjects = useMemo(() => (
+    session?.role?.toLowerCase().includes("account")
+      ? projects.filter((project) => project.am === session.name)
+      : projects
+  ), [projects, session]);
 
-  const summary = useMemo(() => {
-    const tasks = getStoredTasks().filter((task) => {
-      return !session?.role?.toLowerCase().includes("account") || assignedProjects.some((project) => project.id === task.projectId);
-    });
-    const completed = tasks.filter((task) => task.done).length;
-    const totalTasks = tasks.length;
-    const avgProgress = assignedProjects.length
-      ? Math.round(assignedProjects.reduce((sum, project) => sum + project.progress, 0) / assignedProjects.length)
-      : 0;
-    return { totalTasks, completed, avgProgress };
-  }, [assignedProjects, session]);
+  const perAm = useMemo(() => {
+    const counts = new Map();
+    for (const project of projects) {
+      const name = project.am || "Unassigned";
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    return [...counts].map(([am, count]) => ({ am, projects: count }));
+  }, [projects]);
 
-  const perAm = useMemo(() => ams.map((a) => ({ am: a.name, projects: a.activeProjects })), [ams]);
+  const progressTrend = useMemo(() => assignedProjects.map((project) => ({
+    week: project.title,
+    onTime: project.progress,
+  })), [assignedProjects]);
 
-  const handleFileChange = (event) => {
-    setFiles(Array.from(event.target.files || []));
-  };
+  const handleFileChange = (event) => setFiles(Array.from(event.target.files || []));
 
-  const generate = (key) => {
-    setGenerating(key);
-    setTimeout(() => setGenerating(null), 900);
-  };
-
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!message.trim()) {
-      setStatusMessage("Please add a message for the report.");
-      return;
-    }
-    if (kind === "project" && !projectId) {
-      setStatusMessage("Please select a project for a project report.");
-      return;
-    }
+    if (!message.trim()) return setStatusMessage("Please add a message for the report.");
+    if (kind === "project" && !projectId) return setStatusMessage("Please select a project for a project report.");
 
-    const report = {
-      id: `report_${Date.now()}`,
-      author: session?.name || "Unknown",
-      role: session?.role || "Unknown",
-      type: kind,
-      projectId: kind === "project" ? projectId : null,
-      projectTitle: kind === "project" ? assignedProjects.find((project) => project.id === projectId)?.title : null,
-      message: message.trim(),
-      attachments: files.map((file) => file.name),
-      createdAt: new Date().toLocaleString(),
-      status: "Pending",
-    };
-
-    const next = [report, ...reports];
-    saveStoredReports(next);
-    setReports(next);
-    setMessage("");
-    setProjectId("");
-    setFiles([]);
-    setStatusMessage("Report submitted successfully.");
+    try {
+      const report = await apiPost("/reports", {
+        authorId: session?.id,
+        type: kind,
+        projectId: kind === "project" ? projectId : null,
+        message: message.trim(),
+        attachments: files.map((file) => file.name),
+      });
+      setReports((current) => [report, ...current]);
+      setMessage("");
+      setProjectId("");
+      setFiles([]);
+      setStatusMessage("Report submitted successfully.");
+    } catch (error) {
+      setStatusMessage(error.message || "Could not submit the report.");
+    }
   };
 
   return (
@@ -100,7 +96,7 @@ export default function ReportsPage({ ams = [] }) {
           </div>
           <div className="rounded-xl p-4" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
             <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Avg progress</div>
-            <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.avgProgress}%</div>
+            <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.avgProjectProgress}%</div>
           </div>
         </div>
       </div>
@@ -205,7 +201,7 @@ export default function ReportsPage({ ams = [] }) {
             </div>
             <div className="rounded-xl p-4" style={{ background: "#FFFFFF", border: `1px solid ${colors.border}` }}>
               <div className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Avg progress</div>
-              <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.avgProgress}%</div>
+              <div className="mt-2 text-2xl font-semibold" style={{ ...fontBody, color: colors.primary }}>{summary.avgProjectProgress}%</div>
             </div>
           </div>
 
@@ -249,9 +245,9 @@ export default function ReportsPage({ ams = [] }) {
         </div>
 
         <div className="rounded-lg p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
-          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">Delivery trend</h3>
+          <h3 style={{ ...fontDisplay, color: colors.primary }} className="text-lg mb-4">Project progress</h3>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={COMPLETION_TREND}>
+            <LineChart data={progressTrend}>
               <CartesianGrid stroke={colors.border} strokeDasharray="3 3" />
               <XAxis dataKey="week" tick={{ fontSize: 11, fontFamily: "Montserrat" }} stroke={colors.muted} />
               <YAxis tick={{ fontSize: 11, fontFamily: "Montserrat" }} stroke={colors.muted} domain={[0, 100]} />

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { PlusCircle, ClipboardList, FileText, CheckCircle2, CalendarDays } from "lucide-react";
 import { fontBody, fontDisplay, colors } from "../lib/theme";
-import { getSession, getStoredIntakes, saveStoredIntakes, getStoredAMProjectSubmissions, apiPut } from "../lib/teamData";
+import { apiGet, apiPost, apiPut, getSession, getStoredAMProjectSubmissions } from "../lib/teamData";
 
 export default function IntakePage() {
   const [session, setSession] = useState(null);
@@ -9,6 +9,7 @@ export default function IntakePage() {
   const [client, setClient] = useState("");
   const [projectName, setProjectName] = useState("");
   const [priority, setPriority] = useState("medium");
+  const [requestedDeadline, setRequestedDeadline] = useState("");
   const [notes, setNotes] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [projectSubmissions, setProjectSubmissions] = useState([]);
@@ -16,11 +17,12 @@ export default function IntakePage() {
   useEffect(() => {
     const loadIntakeData = async () => {
       setSession(getSession());
-      setIntakes(getStoredIntakes());
-      setProjectSubmissions(await getStoredAMProjectSubmissions());
+      const [intakeRows, submissions] = await Promise.all([apiGet("/om/intakes"), getStoredAMProjectSubmissions()]);
+      setIntakes(intakeRows);
+      setProjectSubmissions(submissions);
     };
 
-    loadIntakeData();
+    loadIntakeData().catch((error) => setStatusMessage(error.message || "Could not load intake data."));
   }, []);
 
   const updateSubmissionStatus = async (submissionId, status) => {
@@ -36,38 +38,31 @@ export default function IntakePage() {
     }
   };
 
-  const saveIntakes = (next) => {
-    saveStoredIntakes(next);
-    setIntakes(next);
-  };
-
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (!client.trim() || !projectName.trim()) {
       setStatusMessage("Please add a client and project name.");
       return;
     }
 
-    const next = [
-      {
-        id: `intake_${Date.now()}`,
+    try {
+      const created = await apiPost("/om/intakes", {
         client: client.trim(),
         projectName: projectName.trim(),
         priority,
         notes: notes.trim(),
-        createdBy: session?.name || "Operations Manager",
-        createdAt: new Date().toLocaleString(),
-        status: "Pending review",
-      },
-      ...intakes,
-    ];
-
-    saveIntakes(next);
-    setClient("");
-    setProjectName("");
-    setPriority("medium");
-    setNotes("");
-    setStatusMessage("Intake request created successfully.");
+        requestedDeadline,
+      });
+      setIntakes((current) => [created, ...current]);
+      setClient("");
+      setProjectName("");
+      setPriority("medium");
+      setRequestedDeadline("");
+      setNotes("");
+      setStatusMessage("Intake request created successfully.");
+    } catch (error) {
+      setStatusMessage(error.message || "Intake request could not be saved.");
+    }
   };
 
   return (
@@ -132,6 +127,8 @@ export default function IntakePage() {
               <span className="text-xs uppercase font-semibold" style={{ ...fontBody, color: colors.muted }}>Requested delivery</span>
               <input
                 type="date"
+                value={requestedDeadline}
+                onChange={(event) => setRequestedDeadline(event.target.value)}
                 className="w-full rounded-xl p-3 text-sm"
                 style={{ border: `1px solid ${colors.border}`, ...fontBody }}
               />

@@ -13,8 +13,8 @@ export default function SignInPage({ onSignIn }) {
     setMessage("");
     setSubmitting(true);
     try {
-      const account = await apiPost("/auth/login", { email, password });
-      onSignIn(account);
+      const authentication = await apiPost("/auth/login", { email, password });
+      onSignIn(authentication.user);
     } catch (error) {
       setMessage(error.message || "Invalid email or password.");
     } finally {

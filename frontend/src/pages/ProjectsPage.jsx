@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, X, CheckCircle, Clock3, FileText } from "lucide-react";
 import { colors, fontDisplay, fontBody } from "../lib/theme";
-import { PROJECTS, PROJECT_DELIVERABLES, PROJECT_HISTORY } from "../lib/mockData";
-import { getSession, getStoredTasks } from "../lib/teamData";
+import { apiGet, getSession } from "../lib/teamData";
 import { statusBadge } from "../lib/status";
 
 const STATUS_FILTERS = [
@@ -77,12 +76,12 @@ function ProjectDetailDrawer({ project, tasks, deliverables, history, onClose })
           <section className="rounded-xl p-5" style={{ background: colors.neutral, border: `1px solid ${colors.border}` }}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: colors.primary, ...fontBody }}>
-                <Clock3 size={16} /> Daily tasks
+                <Clock3 size={16} /> Project tasks
               </div>
               <span className="text-sm" style={{ ...fontBody, color: colors.muted }}>{tasks.length} tasks</span>
             </div>
             {tasks.length === 0 ? (
-              <p className="mt-4 text-sm" style={{ color: colors.muted, ...fontBody }}>No daily tasks added yet; use the planner to assign work for this project.</p>
+              <p className="mt-4 text-sm" style={{ color: colors.muted, ...fontBody }}>No tasks have been created for this project.</p>
             ) : (
               <div className="mt-4 space-y-3">
                 {tasks.map((task) => (
@@ -125,9 +124,42 @@ export default function ProjectsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [selectedDeliverables, setSelectedDeliverables] = useState([]);
+  const [selectedTasks, setSelectedTasks] = useState([]);
+  const [selectedHistory, setSelectedHistory] = useState([]);
+
+  useEffect(() => {
+    apiGet("/om/projects")
+      .then(setProjects)
+      .catch((error) => console.error("Could not load projects:", error));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    const project = projects.find((item) => item.id === selectedProjectId);
+    if (!project) return;
+    Promise.all([
+      apiGet(`/om/projects/${selectedProjectId}/deliverables`),
+      apiGet("/om/tasks"),
+    ])
+      .then(([deliverableRows, taskRows]) => {
+        setSelectedDeliverables(deliverableRows.map((item) => ({
+          ...item,
+          title: item.name,
+          due: item.deadline || "No deadline",
+          status: ["complete", "completed"].includes(String(item.status).toLowerCase()) ? "complete" : "pending",
+        })));
+        setSelectedTasks(taskRows
+          .filter((item) => item.projectId === (project.display_code || `AM-${project.id.slice(0, 8)}`))
+          .map((item) => ({ ...item, title: item.mainTask, note: item.status })));
+        setSelectedHistory([]);
+      })
+      .catch((error) => console.error("Could not load project details:", error));
+  }, [selectedProjectId, projects]);
 
   const visibleProjects = useMemo(() => {
-    const base = session?.role === "Account Manager" ? PROJECTS.filter((project) => project.am === session.name) : PROJECTS;
+    const base = session?.role === "Account Manager" ? projects.filter((project) => project.am === session.name) : projects;
     return base.filter((project) => {
       const searchValue = query.toLowerCase().trim();
       const matchesQuery =
@@ -137,12 +169,9 @@ export default function ProjectsPage() {
       const matchesStatus = statusFilter === "all" || project.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
-  }, [query, statusFilter, session]);
+  }, [projects, query, statusFilter, session]);
 
-  const selectedProject = selectedProjectId ? PROJECTS.find((project) => project.id === selectedProjectId) : null;
-  const selectedDeliverables = selectedProject ? PROJECT_DELIVERABLES[selectedProject.id] || [] : [];
-  const selectedHistory = selectedProject ? PROJECT_HISTORY[selectedProject.id] || [] : [];
-  const selectedTasks = selectedProject ? getStoredTasks().filter((task) => task.projectId === selectedProject.id) : [];
+  const selectedProject = selectedProjectId ? projects.find((project) => project.id === selectedProjectId) : null;
 
   const summary = useMemo(() => {
     const total = visibleProjects.length;

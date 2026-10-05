@@ -1,22 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { fontBody, colors } from "../lib/theme";
-import { getStoredInvites, saveStoredInvites, apiPost } from "../lib/teamData";
+import { apiGet, apiPost } from "../lib/teamData";
 
 export default function InviteSignup({ token, onComplete }) {
-  const [invites, setInvites] = useState([]);
   const [invite, setInvite] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "", role: "" });
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const storedInvites = getStoredInvites();
-    setInvites(storedInvites);
-    const match = storedInvites.find((item) => item.id === token);
-    if (match) {
-      setInvite(match);
-      setForm((prev) => ({ ...prev, email: match.email, role: match.role }));
-    }
+    apiGet(`/invites/verify/${encodeURIComponent(token)}`)
+      .then((match) => {
+        setInvite(match);
+        setForm((previous) => ({ ...previous, email: match.email, role: match.role }));
+      })
+      .catch((error) => setMessage(error.message || "This invitation is invalid or expired."));
   }, [token]);
 
   const handleSubmit = async (event) => {
@@ -28,12 +26,8 @@ export default function InviteSignup({ token, onComplete }) {
 
     setSubmitting(true);
     try {
-      await apiPost("/auth/signup", { name: form.name, email: form.email, password: form.password, role: form.role || "Production" });
-
-      const nextInvites = invites.map((item) => (item.id === token ? { ...item, status: "Accepted" } : item));
-      setInvites(nextInvites);
-      saveStoredInvites(nextInvites);
-      setMessage("Account created successfully. You can now continue to the dashboard.");
+      await apiPost("/auth/signup", { name: form.name, email: form.email, password: form.password, inviteToken: token });
+      setMessage("Account created successfully. You can now sign in.");
       onComplete();
     } catch (error) {
       setMessage(error.message || "Could not create your account.");
